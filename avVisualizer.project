@@ -1,0 +1,114 @@
+#!/usr/bin/avBuilder
+import global "std/c/stdc.project" {
+    buildExecutable as build;
+    recompile;
+    getSourceFiles;
+    requiresRelink;
+    linkExecutable;
+}
+
+compiler = "gcc";
+linker = "gcc";
+
+
+
+dependencies = [
+    "./avVisualizer.project"
+];
+
+clean(){
+    perform {
+        deleteDir("build");
+        deleteDir("bin");
+    }
+}
+
+
+buildLib(){
+    perform{
+        libflags=[
+            "-ggdb",
+            "-MMD",
+            "-DAV_EXPORT"
+        ];
+        includes=[
+            "core/include",
+            "core/src"
+        ];
+
+        libDirs=[
+        ];
+        libs=[
+            "m",
+            "avUtils",
+        ];
+        srcDir = [
+            "core/src"
+        ];
+
+
+        if(PLATFORM=="WINDOWS"){
+            winLibs = [ "user32", "gdi32", "D2d1", "windowscodecs" ];
+            libs = libs + winLibs;
+
+            libName = PROJECT_NAME + ".dll";
+            libLnkName = PROJECT_NAME + ".lib";
+        }else if(PLATFORM=="LINUX"){
+            libName = "lib" + PROJECT_NAME + ".so";
+            libLnkName = "lib" + PROJECT_NAME + ".a";
+        }
+
+        objects = recompile(getSourceFiles(srcDir), "build", libflags, includes, dependencies);
+        
+        if(requiresRelink(libName, objects, dependencies)){
+            makeDir("bin");
+            linkFlags = [ "--shared",compileString("-Wl,--out-implib=bin/$libLnkName") ];
+            linkExecutable(objects, "bin", PROJECT_NAME + ".dll", libflags + linkFlags, libDirs, libs);
+        }
+    }
+
+}
+
+buildTest(){
+    perform{
+
+        libflags=[
+            "-ggdb",
+            "-MMD"
+        ];
+        includes=[
+            "core/include",
+        ];
+
+        libDirs=[
+            "bin"
+        ];
+        libs=[
+            "avVisualizer",
+            "avUtils"
+        ];
+        srcDir = [
+            "testbed/src"
+        ];
+
+        objects = recompile(getSourceFiles(srcDir), "build", libflags, includes, dependencies);
+        
+        if(requiresRelink("test", objects, dependencies)){
+            makeDir("bin");
+            
+            linkExecutable(objects, "bin", "test", libflags, libDirs, libs);
+        }
+    }
+}
+
+avVisualizer() {
+ 
+    perform {
+
+        buildLib();
+        buildTest();
+       
+    }
+}
+
+
