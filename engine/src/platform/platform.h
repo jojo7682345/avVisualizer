@@ -44,7 +44,7 @@ bool8 platformPumpMessages(void);
  * @param message The message to be printed.
  * @param colour The colour to print the text in (if supported).
  */
-void platform_console_write(const char* message, uint8 colour);
+void platformConsoleWrite(const char* message, uint8 colour);
 
 /**
  * @brief Performs platform-specific printing to the error console of the given
@@ -53,7 +53,7 @@ void platform_console_write(const char* message, uint8 colour);
  * @param message The message to be printed.
  * @param colour The colour to print the text in (if supported).
  */
-void platform_console_write_error(const char* message, uint8 colour);
+void platformConsoleWriteError(const char* message, uint8 colour);
 
 /**
  * @brief Gets the absolute time since the application started.

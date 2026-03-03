@@ -7,108 +7,107 @@ import global "std/c/stdc.project" {
     linkExecutable;
 }
 
-compiler = "gcc";
-linker = "gcc";
+var compiler = "gcc";
+var linker = "gcc";
 
-
-
-dependencies = [
+var dependencies = [
     "./avVisualizer.project"
 ];
 
-clean(){
-    perform {
-        deleteDir("build");
-        deleteDir("bin");
-    }
+func clean(){
+    deleteDir("build");
+    deleteDir("bin");
 }
 
+func buildLib(){
+    var libflags=[
+        "-ggdb",
+        "-MMD",
+        "-DAV_EXPORT"
+    ];
+    var includes=[
+        "engine/include",
+        "engine/src",
+        "$#VULKAN_SDK/Include"
+    ];
+    var libDirs=[
+        "$#VULKAN_SDK/Lib"
+    ];
+    var libs=[
+        "m",
+        "avUtils",
+        "vulkan-1",
+    ];
+    var srcDir = [
+        "engine/src"
+    ];
+    var libName = "";
+    var libLnkName = "";
+    if(PLATFORM=="WINDOWS"){
+        libs += [ "user32", "gdi32", "D2d1", "windowscodecs", "opengl32" ];
+        libName = PROJECT_NAME + ".dll";
+        libLnkName = PROJECT_NAME + ".lib";
+    }else if(PLATFORM=="LINUX"){
+        libName = "lib" + PROJECT_NAME + ".so";
+        libLnkName = "lib" + PROJECT_NAME + ".a";
+    }
 
-buildLib(){
-    perform{
-        libflags=[
-            "-ggdb",
-            "-MMD",
-            "-DAV_EXPORT"
-        ];
-        includes=[
-            "core/include",
-            "core/src"
-        ];
+    println("started compilation of engine");
+    var objects = recompile(getSourceFiles(srcDir), "build", libflags, includes, dependencies);
+    
+    if(requiresRelink("bin/"+libName, objects, dependencies)){
+        makeDir("bin");
+        linkExecutable(objects, "bin", PROJECT_NAME + ".dll", libflags + [ "--shared",compileString("-Wl,--out-implib=bin/$libLnkName") ], libDirs, libs);
+    }
+    println("complation of engine complete");
+}
 
-        libDirs=[
-        ];
-        libs=[
-            "m",
-            "avUtils",
-        ];
-        srcDir = [
-            "core/src"
-        ];
+func buildTest(){
+    var libflags=[
+        "-ggdb",
+        "-MMD"
+    ];
+    var includes=[
+        "engine/include",
+    ];
 
-
-        if(PLATFORM=="WINDOWS"){
-            winLibs = [ "user32", "gdi32", "D2d1", "windowscodecs" ];
-            libs = libs + winLibs;
-
-            libName = PROJECT_NAME + ".dll";
-            libLnkName = PROJECT_NAME + ".lib";
-        }else if(PLATFORM=="LINUX"){
-            libName = "lib" + PROJECT_NAME + ".so";
-            libLnkName = "lib" + PROJECT_NAME + ".a";
-        }
-
-        objects = recompile(getSourceFiles(srcDir), "build", libflags, includes, dependencies);
+    var libDirs=[
+        "bin"
+    ];
+    var libs=[
+        "avVisualizer",
+        "avUtils"
+    ];
+    var srcDir = [
+        "testbed/src"
+    ];
+    var libName = "";
+    var libLnkName = "";
+    var binName = "";
+    if(PLATFORM=="WINDOWS"){
+        libName = PROJECT_NAME + ".dll";
+        libLnkName = PROJECT_NAME + ".lib";
+        binName = "test" + ".exe";
+    }else if(PLATFORM=="LINUX"){
+        libName = "lib" + PROJECT_NAME + ".so";
+        libLnkName = "lib" + PROJECT_NAME + ".a";
+        binName = "test";
+    }
+    println("started compilation of testbed");
+    var objects = recompile(getSourceFiles(srcDir), "build", libflags, includes, dependencies + ["bin/" + libName, "bin/" + libLnkName]);
+    
+    if(requiresRelink("bin/" + binName, objects, dependencies + ["bin/" + libName, "bin/" + libLnkName])){
+        makeDir("bin");
         
-        if(requiresRelink(libName, objects, dependencies)){
-            makeDir("bin");
-            linkFlags = [ "--shared",compileString("-Wl,--out-implib=bin/$libLnkName") ];
-            linkExecutable(objects, "bin", PROJECT_NAME + ".dll", libflags + linkFlags, libDirs, libs);
-        }
+        linkExecutable(objects, "bin", "test", libflags, libDirs, libs);
     }
-
-}
-
-buildTest(){
-    perform{
-
-        libflags=[
-            "-ggdb",
-            "-MMD"
-        ];
-        includes=[
-            "core/include",
-        ];
-
-        libDirs=[
-            "bin"
-        ];
-        libs=[
-            "avVisualizer",
-            "avUtils"
-        ];
-        srcDir = [
-            "testbed/src"
-        ];
-
-        objects = recompile(getSourceFiles(srcDir), "build", libflags, includes, dependencies);
-        
-        if(requiresRelink("test", objects, dependencies)){
-            makeDir("bin");
-            
-            linkExecutable(objects, "bin", "test", libflags, libDirs, libs);
-        }
-    }
-}
-
-avVisualizer() {
+    println("complation of testbed complete");
  
-    perform {
+}
 
-        buildLib();
-        buildTest();
-       
-    }
+func avVisualizer() {
+    buildLib();
+    buildTest();
 }
 
 

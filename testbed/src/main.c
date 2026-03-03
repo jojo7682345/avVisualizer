@@ -1,7 +1,5 @@
 #include <entry.h>
 
-
-
 bool8 initialize(struct Application* app_inst){
 
 }
@@ -33,7 +31,7 @@ bool8 create_application(Application* out_application) {
     out_application->appConfig.startPosY = 100;
     out_application->appConfig.startWidth = 1280;
     out_application->appConfig.startHeight = 720;
-    out_application->appConfig.name = "AvVisualizer TestBed";
+    out_application->appConfig.name = "AvVisualizer TestBed!";
 
     out_application->engineState = 0;
     out_application->state = 0;

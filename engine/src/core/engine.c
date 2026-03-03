@@ -3,6 +3,7 @@
 #include "core/clock.h"
 #include "core/input.h"
 #include "platform/platform.h"
+#include "renderer/renderer.h"
 
 #include <AvUtils/avLogging.h>
 #include <AvUtils/avMemory.h>
@@ -73,6 +74,7 @@ bool8 engine_run(Application* game_inst) {
 
 
 
+
     platformSystemConfig platformSystemConfig = {
         .applicationName = game_inst->appConfig.name,
         .x = game_inst->appConfig.startPosX,
@@ -81,9 +83,16 @@ bool8 engine_run(Application* game_inst) {
         .height = game_inst->appConfig.startHeight,
     };
 
+    engineState->width = game_inst->appConfig.startWidth;
+    engineState->height = game_inst->appConfig.startHeight;
+
     platformSystemStartup(&memSize, 0, &platformSystemConfig);
     void* platformMem = avAllocate(memSize, "");
     platformSystemStartup(&memSize, platformMem, &platformSystemConfig);
+
+    rendererStartup(&memSize, 0, 0);
+    void* rendererMem = avAllocate(memSize, "");
+    rendererStartup(&memSize, rendererMem, platformMem);
 
     while (engineState->is_running) {
         if (!platformPumpMessages()) {
@@ -119,6 +128,7 @@ bool8 engine_run(Application* game_inst) {
             //     break;
             // }
 
+            rendererBeginFrame(engineState->width, engineState->height);
             
             // Have the application generate the render packet.
             bool8 prepare_result = engineState->game_inst->prepareFrame(engineState->game_inst);
@@ -134,8 +144,14 @@ bool8 engine_run(Application* game_inst) {
                 break;
             }
 
+            rendererDrawRect(0.1f, 0.1f, 100.0f, 100.0f, (Color4f){.r=0.0f, .g=0.5f, .b=0.0f, .a=1.0f});
+            rendererDrawCircle(150.0f, 150.0f, 100.0f, 50, (Color4f){.r=1.0, .g=0.7f, .b=0.0f, .a=1.0f});
+            rendererDrawLine(0.0f, 500.0f, 500.0f, 0.0f, 2, (Color4f){.r=0.0, .g=0.0f, .b=0.0f, .a=1.0f});
+            renderText(50.0f, 50.0f, "TEST!", (Color4f){.r=0.0, .g=0.0f, .b=0.0f, .a=1.0f});
+
             // End the frame.
             //renderer_end();
+            rendererEndFrame();
 
             // // Present the frame.
             // if (!renderer_present()) {
@@ -203,6 +219,9 @@ static bool8 engineOnEvent(uint16 code, void* sender, void* listener_inst, Event
 
 static bool8 engineOnResized(uint16 code, void* sender, void* listener_inst, EventContext context) {
     if (code == EVENT_CODE_RESIZED) {
+        engineState->width = context.data.u16[0];
+        engineState->height = context.data.u16[1];
+        engineState->game_inst->on_resize(engineState->game_inst, engineState->width, engineState->height);
         return true;
     }
 

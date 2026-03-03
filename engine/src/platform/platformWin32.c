@@ -129,6 +129,10 @@ bool8 platformSystemStartup(uint64 *memoryRequirement, void *state_ptr, void *co
     return true;
 }
 
+void platformWin32GetHWND(void* platformState, HWND* hwnd){
+    (*hwnd) = state->handle.hwnd;
+}
+
 void platformSystemShutdown(void *platformState) {
     if (state && state->handle.hwnd) {
         DestroyWindow(state->handle.hwnd);
@@ -147,7 +151,7 @@ bool8 platformPumpMessages(void) {
     return true;
 }
 
-void platform_console_write(const char *message, uint8 colour) {
+void platformConsoleWrite(const char *message, uint8 colour) {
     HANDLE consoleHandle = GetStdHandle(STD_OUTPUT_HANDLE);
 
     CONSOLE_SCREEN_BUFFER_INFO csbi;
@@ -168,7 +172,7 @@ void platform_console_write(const char *message, uint8 colour) {
     SetConsoleTextAttribute(consoleHandle, csbi.wAttributes);
 }
 
-void platform_console_write_error(const char *message, uint8 colour) {
+void platformConsoleWriteError(const char *message, uint8 colour) {
     HANDLE consoleHandle = GetStdHandle(STD_ERROR_HANDLE);
 
     CONSOLE_SCREEN_BUFFER_INFO csbi;
@@ -328,3 +332,4 @@ LRESULT CALLBACK win32ProcessMessage(HWND hwnd, uint32 msg, WPARAM w_param, LPAR
 
     return DefWindowProcA(hwnd, msg, w_param, l_param);
 }
+
