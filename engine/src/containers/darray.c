@@ -143,24 +143,28 @@ void darrayClear(void* array) {
 }
 
 uint64 darrayCapacity(void* array) {
+    if(array==NULL) return 0;
     uint64 headerSize = sizeof(darrayHeader);
     darrayHeader* header = (darrayHeader*)((uint8*)array - headerSize);
     return header->capacity;
 }
 
 uint64 darrayLength(void* array) {
+    if(array==NULL) return 0;
     uint64 headerSize = sizeof(darrayHeader);
     darrayHeader* header = (darrayHeader*)((uint8*)array - headerSize);
     return header->length;
 }
 
 uint64 darrayStride(void* array) {
+    if(array==NULL) return 0;
     uint64 headerSize = sizeof(darrayHeader);
     darrayHeader* header = (darrayHeader*)((uint8*)array - headerSize);
     return header->stride;
 }
 
 void darrayLengthSet(void* array, uint64 value) {
+    if(array==NULL) return;
     uint64 headerSize = sizeof(darrayHeader);
     darrayHeader* header = (darrayHeader*)((uint8*)array - headerSize);
     header->length = value;

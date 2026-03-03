@@ -1,6 +1,7 @@
 #pragma once
 
 #include "defines.h"
+#include "logging.h"
 
 typedef struct application_config {
     /** @brief Window starting position x axis, if applicable. */
@@ -22,6 +23,8 @@ typedef struct application_config {
 typedef struct Application {
     /** @brief The application configuration. */
     application_config appConfig;
+    AvLogSettings* logSettings;
+
 
     /**
      * @brief Function pointer to the application's boot sequence. This should

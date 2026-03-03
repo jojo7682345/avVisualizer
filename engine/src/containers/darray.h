@@ -74,7 +74,7 @@ AV_API void* _darrayInsertAt(void* array, uint64 index, void* value_ptr);
  * @param type The type to be used to create the darray.
  * @returns A pointer to the array's memory block.
  */
-#define darray_create(type) \
+#define darrayCreate(type) \
     _darrayCreate(DARRAY_DEFAULT_CAPACITY, sizeof(type), 0)
 
 /**

@@ -46,6 +46,8 @@ bool8 engine_create(Application* game_inst) {
         return false;
     }
 
+    if(engineState->game_inst->logSettings) setLogSettings(*engineState->game_inst->logSettings);
+
     return true;
 }
 
@@ -71,10 +73,6 @@ bool8 engine_run(Application* game_inst) {
     void* inputMem = avAllocate(memSize, "");
     inputSystemInitialize(&memSize, inputMem, 0);
 
-
-
-
-
     platformSystemConfig platformSystemConfig = {
         .applicationName = game_inst->appConfig.name,
         .x = game_inst->appConfig.startPosX,
@@ -90,9 +88,18 @@ bool8 engine_run(Application* game_inst) {
     void* platformMem = avAllocate(memSize, "");
     platformSystemStartup(&memSize, platformMem, &platformSystemConfig);
 
-    rendererStartup(&memSize, 0, 0);
+    RendererConfig rendererConfig = {
+        .appName = game_inst->appConfig.name,
+        .engineName = "AV_VISUALIZER",
+        .appVersion = 0,
+        .engineVersion = 0,
+        .enableValidation = true,
+        .platformState = platformMem,
+    };
+
+    rendererStartup(&memSize, 0, &rendererConfig);
     void* rendererMem = avAllocate(memSize, "");
-    rendererStartup(&memSize, rendererMem, platformMem);
+    rendererStartup(&memSize, rendererMem, &rendererConfig);
 
     while (engineState->is_running) {
         if (!platformPumpMessages()) {
@@ -128,7 +135,7 @@ bool8 engine_run(Application* game_inst) {
             //     break;
             // }
 
-            rendererBeginFrame(engineState->width, engineState->height);
+            //rendererBeginFrame(engineState->width, engineState->height);
             
             // Have the application generate the render packet.
             bool8 prepare_result = engineState->game_inst->prepareFrame(engineState->game_inst);
@@ -144,14 +151,10 @@ bool8 engine_run(Application* game_inst) {
                 break;
             }
 
-            rendererDrawRect(0.1f, 0.1f, 100.0f, 100.0f, (Color4f){.r=0.0f, .g=0.5f, .b=0.0f, .a=1.0f});
-            rendererDrawCircle(150.0f, 150.0f, 100.0f, 50, (Color4f){.r=1.0, .g=0.7f, .b=0.0f, .a=1.0f});
-            rendererDrawLine(0.0f, 500.0f, 500.0f, 0.0f, 2, (Color4f){.r=0.0, .g=0.0f, .b=0.0f, .a=1.0f});
-            renderText(50.0f, 50.0f, "TEST!", (Color4f){.r=0.0, .g=0.0f, .b=0.0f, .a=1.0f});
-
             // End the frame.
             //renderer_end();
-            rendererEndFrame();
+
+            
 
             // // Present the frame.
             // if (!renderer_present()) {
@@ -189,6 +192,8 @@ bool8 engine_run(Application* game_inst) {
             engineState->last_time = current_time;
         }
     }
+
+    rendererShutdown(0);
 
     engineState->is_running = false;
 

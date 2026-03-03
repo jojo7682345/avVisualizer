@@ -60,7 +60,7 @@ bool8 eventRegister(uint16 code, void* listener, onEventCallback on_event) {
     }
 
     if (state->registered[code].events == 0) {
-        state->registered[code].events = darray_create(RegisteredEvent);
+        state->registered[code].events = darrayCreate(RegisteredEvent);
     }
 
     uint64 registered_count = darrayLength(state->registered[code].events);
