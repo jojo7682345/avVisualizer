@@ -1,0 +1,38 @@
+#!/usr/bin/avBuilder
+
+var compiler = "gcc";
+var linker = "gcc";
+
+import global "std/c/stdc.project" {
+    buildExecutable as build;
+    recompile;
+    getSourceFiles;
+    requiresRelink;
+    linkExecutable;
+}
+
+var binaryExt = (PLATFORM=="WINDOWS") ? ".exe" : "";
+
+var dependencies = [
+    "./shaderEmbed.project"
+];
+
+func clean(){
+    deleteDir("build");
+    deleteDir("bin");
+}
+
+
+
+func shaderEmbed(){
+    var flags=[
+        "-ggdb",
+        "-MMD",
+    ];
+
+    var objects = recompile(getSourceFiles("src"), "build", flags, "$#VULKAN_SDK/Include", dependencies);
+    if(requiresRelink("bin/shaderEmbed"+binaryExt, objects, dependencies)){
+        makeDir("bin");
+        linkExecutable(objects, "bin", PROJECT_NAME, flags, "$#VULKAN_SDK/Lib", "shaderc_shared");
+    }
+}

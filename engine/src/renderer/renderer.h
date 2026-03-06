@@ -19,5 +19,8 @@ typedef struct  RendererConfig {
 bool8 rendererStartup(uint64* memoryRequirement, void* state, void* config);
 void rendererShutdown(void* state);
 
+void rendererDrawFrame();
+void rendererSignalResize();
+
 void vulkanPlatformGetRequiredExtensionNames(const char*** namesDarray);
 bool32 vulkanPlatformCreateSurface(void* rendererState, void* platformState, void* surface);

@@ -133,6 +133,13 @@ void platformWin32GetHWND(void* platformState, HWND* hwnd){
     (*hwnd) = state->handle.hwnd;
 }
 
+void platformGetFramebufferSize(uint32* width, uint32* height){
+    RECT r;
+    GetClientRect(state->handle.hwnd, &r);
+    *width = r.right - r.left;
+    *height = r.bottom - r.top;
+}
+
 void platformSystemShutdown(void *platformState) {
     if (state && state->handle.hwnd) {
         DestroyWindow(state->handle.hwnd);

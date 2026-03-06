@@ -29,6 +29,9 @@ bool8 platformSystemStartup(uint64* memoryRequirement, void* state, void* config
  */
 void platformSystemShutdown(void* platformState);
 
+
+void platformGetFramebufferSize(uint32* width, uint32* height);
+
 /**
  * @brief Performs any platform-specific message pumping that is required
  * for windowing, etc.

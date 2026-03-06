@@ -151,6 +151,7 @@ bool8 engine_run(Application* game_inst) {
                 break;
             }
 
+            rendererDrawFrame();
             // End the frame.
             //renderer_end();
 
@@ -227,6 +228,7 @@ static bool8 engineOnResized(uint16 code, void* sender, void* listener_inst, Eve
         engineState->width = context.data.u16[0];
         engineState->height = context.data.u16[1];
         engineState->game_inst->on_resize(engineState->game_inst, engineState->width, engineState->height);
+        rendererSignalResize();
         return true;
     }
 

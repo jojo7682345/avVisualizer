@@ -1,22 +1,74 @@
 #!/usr/bin/avBuilder
+var compiler = "gcc";
+var linker = "gcc";
+
 import global "std/c/stdc.project" {
     buildExecutable as build;
     recompile;
     getSourceFiles;
     requiresRelink;
     linkExecutable;
+    requiresRecompile;
 }
 
-var compiler = "gcc";
-var linker = "gcc";
+import global "std/project/import.project" {
+    runFunctionFromProject;
+}
 
-var dependencies = [
-    "./avVisualizer.project"
+var binaryExt = (PLATFORM=="WINDOWS") ? ".exe" : "";
+
+var additionalDependencies = [
+    "./avVisualizer.project",
+    "./tools/shaderEmbed/bin/shaderEmbed" + binaryExt,
+    "./tools/shaderEmbed/bin/shaderEmbed.project",
 ];
 
+
+
 func clean(){
+   runFunctionFromProject("./tools/shaderEmbed/shaderEmbed.project", "clean");
+
     deleteDir("build");
     deleteDir("bin");
+    deleteDir("shaders/include");
+    
+}
+
+func buildShader(output, shaders){
+
+    var dependencyFile = output + ".d";
+    var dependencies = parseDependencies(dependencyFile, [output, dependencyFile]);
+    var retcode = 0;
+    if(requiresRelink(output, dependencies, additionalDependencies)){
+        println(command[retcode] "./tools/shaderEmbed/bin/shaderEmbed -O2 -MD -o $output $shaders");
+    }
+    if(retcode==0){
+        return 1;
+    }
+    return 0;
+}
+
+func buildShaders(){
+    var outputDir = "shaders/include/";
+    makeDir(outputDir);
+    var shaders = directories in "shaders/src";
+    var ret = 1;
+    foreach shader from shaders{
+        var shaderName = "shaders/include/" + fileName(shader) + ".h";
+        
+        var shaderFiles = filter(FILTER_TYPE_ENDS_WITH, [".frag", ".vert", ".comp"], files in shader);
+        if(!shaderFiles){
+            println("Shader directory " + shader + " is empty");
+            continue;
+        }
+        if(buildShader(shaderName, shaderFiles)){
+            println("Build " + shaderName + " sucessully");
+        }else{
+            println("Build " + shaderName + " failed");
+            ret = 0;
+        }
+    }
+    return ret;
 }
 
 func buildLib(){
@@ -28,6 +80,7 @@ func buildLib(){
     var includes=[
         "engine/include",
         "engine/src",
+        "shaders/include",
         "$#VULKAN_SDK/Include"
     ];
     var libDirs=[
@@ -37,6 +90,7 @@ func buildLib(){
         "m",
         "avUtils",
         "vulkan-1",
+        "shaderc"
     ];
     var srcDir = [
         "engine/src"
@@ -53,9 +107,9 @@ func buildLib(){
     }
 
     println("started compilation of engine");
-    var objects = recompile(getSourceFiles(srcDir), "build", libflags, includes, dependencies);
+    var objects = recompile(getSourceFiles(srcDir), "build", libflags, includes, additionalDependencies);
     
-    if(requiresRelink("bin/"+libName, objects, dependencies)){
+    if(requiresRelink("bin/"+libName, objects, additionalDependencies)){
         makeDir("bin");
         linkExecutable(objects, "bin", PROJECT_NAME + ".dll", libflags + [ "--shared",compileString("-Wl,--out-implib=bin/$libLnkName") ], libDirs, libs);
     }
@@ -94,9 +148,9 @@ func buildTest(){
         binName = "test";
     }
     println("started compilation of testbed");
-    var objects = recompile(getSourceFiles(srcDir), "build", libflags, includes, dependencies + ["bin/" + libName, "bin/" + libLnkName]);
+    var objects = recompile(getSourceFiles(srcDir), "build", libflags, includes, additionalDependencies ); //+ ["bin/" + libName, "bin/" + libLnkName]
     
-    if(requiresRelink("bin/" + binName, objects, dependencies + ["bin/" + libName, "bin/" + libLnkName])){
+    if(requiresRelink("bin/" + binName, objects, additionalDependencies)){ // + ["bin/" + libName, "bin/" + libLnkName]
         makeDir("bin");
         
         linkExecutable(objects, "bin", "test", libflags, libDirs, libs);
@@ -106,6 +160,11 @@ func buildTest(){
 }
 
 func avVisualizer() {
+    runFunctionFromProject("./tools/shaderEmbed/shaderEmbed.project", "shaderEmbed");
+    if(!buildShaders()){
+        println("Failed to build shaders");
+        return -1;
+    }
     buildLib();
     buildTest();
 }

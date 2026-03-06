@@ -9,7 +9,7 @@ typedef struct darrayHeader {
     AvAllocator* allocator;
 } darrayHeader;
 
-void* _darrayCreate(uint64 length, uint64 stride, AvAllocator* allocator) {
+void* _darrayCreate(uint64 length, uint64 stride, uint64 initLength, AvAllocator* allocator) {
     uint64 headerSize = sizeof(darrayHeader);
     uint64 arraySize = length * stride;
     void* newArray = 0;
@@ -25,7 +25,7 @@ void* _darrayCreate(uint64 length, uint64 stride, AvAllocator* allocator) {
     }
     darrayHeader* header = newArray;
     header->capacity = length;
-    header->length = 0;
+    header->length = initLength;
     header->stride = stride;
     header->allocator = allocator;
 
@@ -50,7 +50,7 @@ void* _darrayResize(void* array) {
         avAssert(0, "_darray_resize called on an array with 0 capacity. This should not be possible.");
         return 0;
     }
-    void* temp = _darrayCreate((DARRAY_RESIZE_FACTOR * header->capacity), header->stride, header->allocator);
+    void* temp = _darrayCreate((DARRAY_RESIZE_FACTOR * header->capacity), header->stride, 0, header->allocator);
 
     header = (darrayHeader*)((uint8*)array - headerSize);
     avMemcpy(temp, array, header->length * header->stride);

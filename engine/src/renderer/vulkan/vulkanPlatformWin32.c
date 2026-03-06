@@ -20,7 +20,8 @@ bool32 vulkanPlatformCreateSurface(void* rendererState, void* platformState, voi
 	createInfo.hinstance = handle->instance;
 	createInfo.hwnd = handle->hwnd;
 	createInfo.flags = 0;
-	if(!vkCreateWin32SurfaceKHR(*instance, &createInfo, NULL, surface)){
+	VkResult result = VK_SUCCESS;
+	if((result = vkCreateWin32SurfaceKHR(*instance, &createInfo, NULL, surface)) != VK_SUCCESS){
 		avFatal("Unable to create surface");
 		return false;
 	}
