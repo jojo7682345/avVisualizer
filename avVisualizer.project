@@ -71,6 +71,10 @@ func buildShaders(){
     return ret;
 }
 
+func getCppFiles(src){
+    return filter(FILTER_TYPE_ENDS_WITH, [".cpp"], files in src recursive);
+}
+
 func buildLib(){
     var libflags=[
         "-ggdb",
@@ -79,6 +83,7 @@ func buildLib(){
     ];
     var includes=[
         "engine/include",
+        "engine/include/imgui",
         "engine/src",
         "shaders/include",
         "$#VULKAN_SDK/Include"
@@ -90,7 +95,7 @@ func buildLib(){
         "m",
         "avUtils",
         "vulkan-1",
-        "shaderc"
+        "shaderc_shared"
     ];
     var srcDir = [
         "engine/src"
@@ -98,7 +103,7 @@ func buildLib(){
     var libName = "";
     var libLnkName = "";
     if(PLATFORM=="WINDOWS"){
-        libs += [ "user32", "gdi32", "D2d1", "windowscodecs", "opengl32" ];
+        libs += [ "user32", "gdi32", "D2d1", "windowscodecs", "opengl32", "Dwmapi" ];
         libName = PROJECT_NAME + ".dll";
         libLnkName = PROJECT_NAME + ".lib";
     }else if(PLATFORM=="LINUX"){
@@ -108,13 +113,15 @@ func buildLib(){
 
     println("started compilation of engine");
     var objects = recompile(getSourceFiles(srcDir), "build", libflags, includes, additionalDependencies);
-    
+    objects += recompile(getCppFiles(srcDir), "build", libflags + ["-xc++", "-lstdc++", "-shared-libgcc" ], includes, additionalDependencies); //+ 
     if(requiresRelink("bin/"+libName, objects, additionalDependencies)){
         makeDir("bin");
-        linkExecutable(objects, "bin", PROJECT_NAME + ".dll", libflags + [ "--shared",compileString("-Wl,--out-implib=bin/$libLnkName") ], libDirs, libs);
+        linkExecutable(objects, "bin", PROJECT_NAME + ".dll", libflags + [ "--shared",compileString("-Wl,--out-implib=bin/$libLnkName"), "-shared-libgcc" ], libDirs, libs + ["stdc++"]);
     }
     println("complation of engine complete");
 }
+
+
 
 func buildTest(){
     var libflags=[
@@ -149,7 +156,7 @@ func buildTest(){
     }
     println("started compilation of testbed");
     var objects = recompile(getSourceFiles(srcDir), "build", libflags, includes, additionalDependencies ); //+ ["bin/" + libName, "bin/" + libLnkName]
-    
+    objects += recompile(getCppFiles(srcDir), "build", libflags, includes, additionalDependencies);
     if(requiresRelink("bin/" + binName, objects, additionalDependencies)){ // + ["bin/" + libName, "bin/" + libLnkName]
         makeDir("bin");
         

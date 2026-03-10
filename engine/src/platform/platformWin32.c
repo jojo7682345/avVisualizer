@@ -126,6 +126,9 @@ bool8 platformSystemStartup(uint64 *memoryRequirement, void *state_ptr, void *co
     // Clock setup
     clock_setup();
 
+    extern void initPlatformCpp(HWND hwnd);
+    initPlatformCpp(handle);
+
     return true;
 }
 
@@ -215,6 +218,13 @@ void platformSleep(uint64 ms) {
 }
 
 LRESULT CALLBACK win32ProcessMessage(HWND hwnd, uint32 msg, WPARAM w_param, LPARAM l_param) {
+    
+    extern LRESULT platformCppProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+    LRESULT res = 0;
+    if(res = platformCppProc(hwnd, msg, w_param, l_param)){
+        return res;
+    }
+
     switch (msg) {
         case WM_ERASEBKGND:
             // Notify the OS that erasing will be handled by the application to prevent flicker.

@@ -1,19 +1,14 @@
 #include <entry.h>
 
+extern bool8 renderFrame(struct Application*);
+extern bool8 initialize(struct Application*);
 
-bool8 initialize(struct Application* app_inst){
-
-}
 
 bool8 update(struct Application* app_inst){
 
 }
 
 bool8 prepareFrame(struct Application* app_inst){
-
-}
-
-bool8 renderFrame(struct Application* app_inst){
 
 }
 

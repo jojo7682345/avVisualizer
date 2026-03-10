@@ -48,6 +48,8 @@ typedef struct RendererState {
     VkBuffer* uniformBuffers;
     VkDeviceMemory* uniformBuffersMemory;
     void** uniformBuffersMapped;
+
+    uint32 graphicsQueueFamily;
 } RendererState;
 
 struct RendererState* state;
@@ -384,6 +386,9 @@ void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32 imageIndex){
 
     vkCmdDrawIndexed(commandBuffer, sizeof(indices)/sizeof(uint16), 1, 0, 0, 0);
 
+    extern void ImGuiRendererDraw(VkCommandBuffer cmd);
+    ImGuiRendererDraw(commandBuffer);
+
     vkCmdEndRenderPass(commandBuffer);
 
     if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
@@ -597,54 +602,55 @@ void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyF
     vkBindBufferMemory(state->device, *buffer, *bufferMemory, 0);
 }
 
-void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size){
-    VkCommandBufferAllocateInfo allocInfo = {0};
+VkCommandBuffer beginSingleTimeCommands() {
+    VkCommandBufferAllocateInfo allocInfo = { 0 };
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     allocInfo.commandPool = state->commandPool;
     allocInfo.commandBufferCount = 1;
 
     VkCommandBuffer commandBuffer;
-    if(vkAllocateCommandBuffers(state->device, &allocInfo, &commandBuffer)!=VK_SUCCESS){
-        avFatal("Failed to allocate copy operation command buffer");
-        return;
-    }
+    vkAllocateCommandBuffers(state->device, &allocInfo, &commandBuffer);
 
-    VkCommandBufferBeginInfo beginInfo = {0};
+    VkCommandBufferBeginInfo beginInfo = { 0 };
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-    if(vkBeginCommandBuffer(commandBuffer, &beginInfo)!=VK_SUCCESS){
-        vkFreeCommandBuffers(state->device, state->commandPool, 1, &commandBuffer);
-        avFatal("Failed to begin command buffer");
-        return;
-    }
 
-    VkBufferCopy copyRegion = {0};
-    copyRegion.srcOffset = 0;
-    copyRegion.dstOffset = 0;
-    copyRegion.size = size;
-    vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
+    vkBeginCommandBuffer(commandBuffer, &beginInfo);
 
-    if(vkEndCommandBuffer(commandBuffer)!=VK_SUCCESS){
-        vkFreeCommandBuffers(state->device, state->commandPool, 1, &commandBuffer);
-        avFatal("Failed to end command buffer");
-        return;
-    }
+    return commandBuffer;
+}
 
-    VkSubmitInfo submitInfo = {0};
+void endSingleTimeCommands(VkCommandBuffer commandBuffer) {
+    vkEndCommandBuffer(commandBuffer);
+
+    VkSubmitInfo submitInfo = { 0 };
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     submitInfo.commandBufferCount = 1;
     submitInfo.pCommandBuffers = &commandBuffer;
-    if(vkQueueSubmit(state->graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE)!=VK_SUCCESS){
-        vkFreeCommandBuffers(state->device, state->commandPool, 1, &commandBuffer);
-        avFatal("Failed to submit command buffer");
-        return;
-    }
+
+    vkQueueSubmit(state->graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
     vkQueueWaitIdle(state->graphicsQueue);
+
     vkFreeCommandBuffers(state->device, state->commandPool, 1, &commandBuffer);
 }
 
+void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size){
+    VkCommandBuffer commandBuffer = beginSingleTimeCommands();
+
+    VkBufferCopy copyRegion = { 0 };
+    copyRegion.size = size;
+    vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
+
+    endSingleTimeCommands(commandBuffer);
+}
+
+
+
+void testFunc();
+
 bool8 rendererStartup(uint64* memoryRequirement, void* statePtr, void* config){
+    
     RendererConfig *typedConfig = (RendererConfig *)config;
     *memoryRequirement = sizeof(RendererState);
     if(statePtr == 0){
@@ -652,6 +658,8 @@ bool8 rendererStartup(uint64* memoryRequirement, void* statePtr, void* config){
     }
     avMemset(statePtr, 0, sizeof(RendererState));
     state = statePtr;
+    
+    testFunc();
 
     const char** requiredValidationLayerNames = 0;
     uint32 requiredValidationLayerCount = 0;
@@ -825,6 +833,7 @@ bool8 rendererStartup(uint64* memoryRequirement, void* statePtr, void* config){
 
         vkGetDeviceQueue(state->device, indices.graphicsFamily, 0, &state->graphicsQueue);
         vkGetDeviceQueue(state->device, indices.presentFamily, 0, &state->presentQueue);
+        state->graphicsQueueFamily = indices.graphicsFamily;
     }
     
     if(!createSwapchain()){
@@ -901,6 +910,7 @@ bool8 rendererStartup(uint64* memoryRequirement, void* statePtr, void* config){
             avFatal("Failedto create descriptor set layout");
             return false;
         }
+
 
     }
     /*
@@ -1223,6 +1233,10 @@ bool8 rendererStartup(uint64* memoryRequirement, void* statePtr, void* config){
             }
         }
     }
+
+    extern void ImGuiRendererInit(VkInstance instance, VkPhysicalDevice physicalDevice, VkDevice device, VkQueue graphicsQueue, uint32 imageCount, uint32 minImageCount, uint32 graphicsQueueFamily, VkRenderPass renderPass);
+    ImGuiRendererInit(state->instance, state->physicalDevice, state->device, state->graphicsQueue, state->imageCount, 2, state->graphicsQueueFamily, state->renderPass);
+
     return true;
 
 }
@@ -1268,10 +1282,10 @@ void rendererDrawFrame(){
     vkResetFences(state->device, 1, &state->inFlightFence[frameIndex]);
     
     vkResetCommandBuffer(state->commandBuffer[imageIndex], 0);
+    updateUniformBuffer(imageIndex);
     recordCommandBuffer(state->commandBuffer[imageIndex], imageIndex);
 
-    updateUniformBuffer(imageIndex);
-
+   
     VkSubmitInfo submitInfo = {0};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
@@ -1330,8 +1344,10 @@ static void cleanupSwapchain(){
 }
 
 void rendererShutdown(void* statePtr){
-
     vkDeviceWaitIdle(state->device);
+    extern void ImGuiRendererCleanup(VkDevice device);
+    ImGuiRendererCleanup(state->device);
+
     cleanupSwapchain();
 
     for(uint32 i = 0; i < state->imageCount; i++){
@@ -1371,4 +1387,59 @@ void rendererShutdown(void* statePtr){
         destroyDebugUtilsMessengerEXT(state->instance, *state->debugMessenger, NULL);
     }
     vkDestroyInstance(state->instance, NULL);
+}
+
+#include "renderer/shaders/shaders.h"
+#include <AvUtils/avFileSystem.h>
+
+void testFunc(){
+    Shader shader = {0};
+    
+    const char* vertexFileName = "../shaders/src/basic_shader/basic_shader.vert";
+    AvFile vertexFile = avFileHandleCreate(AV_CSTR(vertexFileName));
+    avFileOpen(vertexFile, AV_FILE_OPEN_READ_DEFAULT);
+    uint64 vertexSize = avFileGetSize(vertexFile);
+    char* vertexCode = avAllocate(vertexSize, "");
+    avFileRead(vertexCode, vertexSize, vertexFile);
+    avFileClose(vertexFile);
+    avFileHandleDestroy(vertexFile);
+
+    const char* fragmentFileName = "../shaders/src/basic_shader/basic_shader.frag";
+    AvFile fragmentFile = avFileHandleCreate(AV_CSTR(fragmentFileName));
+    avFileOpen(fragmentFile, AV_FILE_OPEN_READ_DEFAULT);
+    uint64 fragmentSize = avFileGetSize(fragmentFile);
+    char* fragmentCode = avAllocate(fragmentSize, "");
+    avFileRead(fragmentCode, fragmentSize, fragmentFile);
+    avFileClose(fragmentFile);
+    avFileHandleDestroy(fragmentFile);
+
+
+
+    ShaderStageLoadInfo vertexInfo = {0};
+    vertexInfo.entry = "main";
+    vertexInfo.stage = SHADER_STAGE_VERTEX;
+    vertexInfo.fileName = vertexFileName;
+    vertexInfo.code = vertexCode;
+    vertexInfo.codeSize = vertexSize;
+
+    ShaderStageLoadInfo fragmentInfo = {0};
+    fragmentInfo.entry = "main";
+    fragmentInfo.stage = SHADER_STAGE_FRAGMENT;
+    fragmentInfo.fileName = fragmentFileName;
+    fragmentInfo.code = fragmentCode;
+    fragmentInfo.codeSize = fragmentSize;
+
+    ShaderStageLoadInfo stageInfos[] = {vertexInfo, fragmentInfo};
+    ShaderLoadInfo info = {0};
+    info.optimization = SHADER_OPTIMIZATION_NONE;
+    info.shaderStageCount = 2;
+    info.shaderStages = stageInfos;
+    
+    VkVertexInputAttributeDescription attributeDescriptions[2] = {0};
+    getAttributeDescriptions(attributeDescriptions);
+    info.vertexInputAttributeCount = 2;
+    info.vertexInputAttributes = attributeDescriptions;
+
+    bool32 ret = loadShader(state->device, info, &shader);
+    
 }

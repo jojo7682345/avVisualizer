@@ -40,11 +40,7 @@ bool8 engine_create(Application* game_inst) {
     engineState->is_running = false;
     engineState->is_suspended = false;
 
-    // Initialize the game.
-    if (!engineState->game_inst->initialize(engineState->game_inst)) {
-        avAssert(0, "Game failed to initialize.");
-        return false;
-    }
+    
 
     if(engineState->game_inst->logSettings) setLogSettings(*engineState->game_inst->logSettings);
 
@@ -101,6 +97,12 @@ bool8 engine_run(Application* game_inst) {
     void* rendererMem = avAllocate(memSize, "");
     rendererStartup(&memSize, rendererMem, &rendererConfig);
 
+    // Initialize the game.
+    if (!engineState->game_inst->initialize(engineState->game_inst)) {
+        avAssert(0, "Game failed to initialize.");
+        return false;
+    }
+
     while (engineState->is_running) {
         if (!platformPumpMessages()) {
             engineState->is_running = false;
@@ -143,13 +145,16 @@ bool8 engine_run(Application* game_inst) {
             if (!prepare_result) {
                 continue;
             }
-
+            extern void startFrame();
+            extern void endFrame();
+            startFrame();
             // Call the game's render routine.
             if (!engineState->game_inst->renderFrame(engineState->game_inst)) {
                 avAssert(0, "Game render failed, shutting down.");
                 engineState->is_running = false;
                 break;
             }
+            endFrame();
 
             rendererDrawFrame();
             // End the frame.
