@@ -1,6 +1,7 @@
 #include "platform.h"
 #include "core/input.h"
 #include "core/event.h"
+#include "engine.h"
 
 #include <AvUtils/avLogging.h>
 
@@ -217,6 +218,10 @@ void platformSleep(uint64 ms) {
     Sleep(ms);
 }
 
+static bool32 resizing = false;
+static uint32 pendingWidth = 0;
+static uint32 pendingHeight = 0;
+
 LRESULT CALLBACK win32ProcessMessage(HWND hwnd, uint32 msg, WPARAM w_param, LPARAM l_param) {
     
     extern LRESULT platformCppProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -232,7 +237,7 @@ LRESULT CALLBACK win32ProcessMessage(HWND hwnd, uint32 msg, WPARAM w_param, LPAR
         case WM_CLOSE:
             // TODO: Fire an event for the application to quit.
             EventContext data = {};
-            eventFire(EVENT_CODE_APPLICATION_QUIT, 0, data);
+            eventFire(EVENT(EVENT_CODE_APPLICATION_QUIT, 0, data));
             return 0;
         case WM_DESTROY:
             PostQuitMessage(0);
@@ -250,8 +255,8 @@ LRESULT CALLBACK win32ProcessMessage(HWND hwnd, uint32 msg, WPARAM w_param, LPAR
             // Get the updated size.
             RECT r;
             GetClientRect(hwnd, &r);
-            uint32 width = r.right - r.left;
-            uint32 height = r.bottom - r.top;
+            pendingWidth = r.right - r.left;
+            pendingHeight = r.bottom - r.top;
 
             {
                 HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
@@ -265,13 +270,25 @@ LRESULT CALLBACK win32ProcessMessage(HWND hwnd, uint32 msg, WPARAM w_param, LPAR
                 //KINFO("monitor: %u", monitor_info.rcMonitor.left);
             }
 
-            // Fire the event. The application layer should pick this up, but not handle it
-            // as it shouldn be visible to other parts of the application.
-            EventContext context;
-            context.data.u16[0] = (uint16)width;
-            context.data.u16[1] = (uint16)height;
-            eventFire(EVENT_CODE_RESIZED, 0, context);
+            if(!resizing){
+                // Fire the event. The application layer should pick this up, but not handle it
+                // as it shouldn be visible to other parts of the application.
+                EventContext context;
+                context.data.u16[0] = (uint16)pendingWidth;
+                context.data.u16[1] = (uint16)pendingWidth;
+                eventFireOverwrite(EVENT(EVENT_CODE_RESIZED, 0, context));
+            }
         } break;
+        case WM_ENTERSIZEMOVE:
+            resizing = true;
+            break;
+        case WM_EXITSIZEMOVE:
+            resizing = false;
+            EventContext context;
+            context.data.u16[0] = (uint16)pendingWidth;
+            context.data.u16[1] = (uint16)pendingWidth;
+            eventFireOverwrite(EVENT(EVENT_CODE_RESIZED, 0, context));
+            break;
         case WM_KEYDOWN:
         case WM_SYSKEYDOWN:
         case WM_KEYUP:

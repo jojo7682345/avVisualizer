@@ -5,11 +5,11 @@ extern bool8 initialize(struct Application*);
 
 
 bool8 update(struct Application* app_inst){
-
+    return true;
 }
 
 bool8 prepareFrame(struct Application* app_inst){
-
+    return true;
 }
 
 void onResize(struct Application* app_inst, uint32 width, uint32 height){

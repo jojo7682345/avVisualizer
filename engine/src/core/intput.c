@@ -1,5 +1,6 @@
 #include "core/input.h"
 #include "core/event.h"
+#include "engine.h"
 #include <AvUtils/avMemory.h>
 
 typedef struct keyboard_state {
@@ -177,7 +178,7 @@ void inputProcessKey(Keys key, bool8 pressed) {
         EventContext context;
         context.data.u16[0] = key;
         context.data.u16[1] = is_repeat ? 1 : 0;
-        eventFire(pressed ? EVENT_CODE_KEY_PRESSED : EVENT_CODE_KEY_RELEASED, 0, context);
+        eventFire(EVENT(pressed ? EVENT_CODE_KEY_PRESSED : EVENT_CODE_KEY_RELEASED, 0, context));
     }
 }
 
@@ -191,7 +192,7 @@ void inputProcessButton(Buttons button, bool8 pressed) {
         context.data.u16[0] = button;
         context.data.i16[1] = state->mouseCurrent.x;
         context.data.i16[2] = state->mouseCurrent.y;
-        eventFire(pressed ? EVENT_CODE_BUTTON_PRESSED : EVENT_CODE_BUTTON_RELEASED, 0, context);
+        eventFire(EVENT(pressed ? EVENT_CODE_BUTTON_PRESSED : EVENT_CODE_BUTTON_RELEASED, 0, context));
     }
 
     // Check for drag releases.
@@ -206,7 +207,7 @@ void inputProcessButton(Buttons button, bool8 pressed) {
             context.data.i16[0] = state->mouseCurrent.x;
             context.data.i16[1] = state->mouseCurrent.y;
             context.data.u16[2] = button;
-            eventFire(EVENT_CODE_MOUSE_DRAG_END, 0, context);
+            eventFire(EVENT(EVENT_CODE_MOUSE_DRAG_END, 0, context));
         } else {
             // If not a drag release, then it is a click.
 
@@ -215,7 +216,7 @@ void inputProcessButton(Buttons button, bool8 pressed) {
             context.data.u16[0] = button;
             context.data.i16[1] = state->mouseCurrent.x;
             context.data.i16[2] = state->mouseCurrent.y;
-            eventFire(EVENT_CODE_BUTTON_CLICKED, 0, context);
+            eventFire(EVENT(EVENT_CODE_BUTTON_CLICKED, 0, context));
         }
     }
 }
@@ -234,7 +235,7 @@ void inputProcessMouseMove(int16 x, int16 y) {
         EventContext context;
         context.data.i16[0] = x;
         context.data.i16[1] = y;
-        eventFire(EVENT_CODE_MOUSE_MOVED, 0, context);
+        eventFire(EVENT(EVENT_CODE_MOUSE_MOVED, 0, context));
 
         for (uint16 i = 0; i < BUTTON_MAX_BUTTONS; ++i) {
             // Check if the button is down first.
@@ -248,7 +249,7 @@ void inputProcessMouseMove(int16 x, int16 y) {
                     drag_context.data.i16[0] = state->mouseCurrent.x;
                     drag_context.data.i16[1] = state->mouseCurrent.y;
                     drag_context.data.u16[2] = i;
-                    eventFire(EVENT_CODE_MOUSE_DRAG_BEGIN, 0, drag_context);
+                    eventFire(EVENT(EVENT_CODE_MOUSE_DRAG_BEGIN, 0, drag_context));
                     // KTRACE("mouse drag began at: x:%hi, y:%hi, button: %hu", state->mouse_current.x, state->mouse_current.y, i);
                 } else if (state->mouseCurrent.dragging[i]) {
                     // Issue a continuance of the drag operation.
@@ -256,7 +257,7 @@ void inputProcessMouseMove(int16 x, int16 y) {
                     drag_context.data.i16[0] = state->mouseCurrent.x;
                     drag_context.data.i16[1] = state->mouseCurrent.y;
                     drag_context.data.u16[2] = i;
-                    eventFire(EVENT_CODE_MOUSE_DRAGGED, 0, drag_context);
+                    eventFire(EVENT(EVENT_CODE_MOUSE_DRAGGED, 0, drag_context));
                     // KTRACE("mouse drag continued at: x:%hi, y:%hi, button: %hu", state->mouse_current.x, state->mouse_current.y, i);
                 }
             }
@@ -270,7 +271,7 @@ void inputProcessMouseWheel(int8 z_delta) {
     // Fire the event.
     EventContext context;
     context.data.i8[0] = z_delta;
-    eventFire(EVENT_CODE_MOUSE_WHEEL, 0, context);
+    eventFire(EVENT(EVENT_CODE_MOUSE_WHEEL, 0, context));
 }
 
 void inputKeyRepeatsEnable(bool8 enable) {

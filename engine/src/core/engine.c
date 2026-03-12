@@ -16,6 +16,7 @@ typedef struct engine_state_t {
     int16 height;
     Clock clock;
     double last_time;
+    uint64 frameIndex;
 
     // Indicates if the window is currently being resized.
     //b8 resizing;
@@ -47,24 +48,19 @@ bool8 engine_create(Application* game_inst) {
     return true;
 }
 
-static bool8 engineOnEvent(uint16 code, void* sender, void* listener_inst, EventContext context);
+// static void engineOnEvent(uint16 code, void* sender, void* listener_inst, EventContext context);
 
-bool8 engine_run(Application* game_inst) {
-    engineState->is_running = true;
-    clockStart(&engineState->clock);
-    clockUpdate(&engineState->clock);
-    engineState->last_time = engineState->clock.elapsed;
-    // f64 running_time = 0;
-    // TODO: frame rate lock
-    // u8 frame_count = 0;
-    double target_frame_seconds = 1.0f / 60;
-    double frame_elapsed_time = 0;
-    
+
+bool8 systemsInitialize(Application* game_inst){
+    EventSystemConfig eventConfig = {0};
+    eventConfig.maxIDs = 0xffff;
     uint64 memSize = 0;
-    eventSystemInitialize(&memSize, 0, 0);
+    eventSystemInitialize(&memSize, 0, &eventConfig);
     void* eventMem = avAllocate(memSize, "");
-    eventSystemInitialize(&memSize, eventMem, 0);
+    eventSystemInitialize(&memSize, eventMem, &eventConfig);
 
+    engine_on_event_system_initialized();
+    
     inputSystemInitialize(&memSize, 0, 0);
     void* inputMem = avAllocate(memSize, "");
     inputSystemInitialize(&memSize, inputMem, 0);
@@ -97,6 +93,21 @@ bool8 engine_run(Application* game_inst) {
     void* rendererMem = avAllocate(memSize, "");
     rendererStartup(&memSize, rendererMem, &rendererConfig);
 
+}
+
+bool8 engine_run(Application* game_inst) {
+    engineState->is_running = true;
+    clockStart(&engineState->clock);
+    clockUpdate(&engineState->clock);
+    engineState->last_time = engineState->clock.elapsed;
+    // f64 running_time = 0;
+    // TODO: frame rate lock
+    // u8 frame_count = 0;
+    double target_frame_seconds = 1.0f / 60;
+    double frame_elapsed_time = 0;
+    
+    systemsInitialize(game_inst);
+    
     // Initialize the game.
     if (!engineState->game_inst->initialize(engineState->game_inst)) {
         avAssert(0, "Game failed to initialize.");
@@ -107,7 +118,7 @@ bool8 engine_run(Application* game_inst) {
         if (!platformPumpMessages()) {
             engineState->is_running = false;
         }
-
+        eventsDispatch();
         if (!engineState->is_suspended) {
             // Update clock and get delta time.
             clockUpdate(&engineState->clock);
@@ -196,6 +207,7 @@ bool8 engine_run(Application* game_inst) {
 
             // Update last time
             engineState->last_time = current_time;
+            engineState->frameIndex++;
         }
     }
 
@@ -207,43 +219,59 @@ bool8 engine_run(Application* game_inst) {
     engineState->game_inst->shutdown(engineState->game_inst);
 
     // Unregister from events.
-    eventUnregister(EVENT_CODE_APPLICATION_QUIT, 0, engineOnEvent);
+    //eventUnregister(EVENT_CODE_APPLICATION_QUIT, 0, engineOnEvent);
+    //unregisterEventSink(EVENT_CODE_APPLICATION_QUIT, 0);
+    //inputSystemShutdown(inputMem);
 
-    inputSystemShutdown(inputMem);
-
-    platformSystemShutdown(platformMem);
+    //platformSystemShutdown(platformMem);
 
     return true;
 }
 
-static bool8 engineOnEvent(uint16 code, void* sender, void* listener_inst, EventContext context) {
-    switch (code) {
-        case EVENT_CODE_APPLICATION_QUIT: {
-            //KINFO("EVENT_CODE_APPLICATION_QUIT recieved, shutting down.\n");
-            engineState->is_running = false;
-            return true;
+static void engineOnEvent(Event* events, uint32 count) {
+    for(uint32 i = 0; i < count; i++){
+        Event* event = events+i;
+        switch (event->id) {
+            case EVENT_CODE_APPLICATION_QUIT: {
+                //KINFO("EVENT_CODE_APPLICATION_QUIT recieved, shutting down.\n");
+                engineState->is_running = false;
+                event->flags.consumed = 1;
+                continue;
+            }
         }
     }
-
-    return false;
 }
 
-static bool8 engineOnResized(uint16 code, void* sender, void* listener_inst, EventContext context) {
-    if (code == EVENT_CODE_RESIZED) {
-        engineState->width = context.data.u16[0];
-        engineState->height = context.data.u16[1];
+static void engineOnResized(Event* events, uint32 count){//(uint16 code, void* sender, void* listener_inst, EventContext context) {
+    bool32 resized = false;
+    uint16 width = 0;
+    uint16 height = 0;
+    for(uint32 i = 0; i < count; i++){
+        Event* event = events+i;
+
+        if (event->id == EVENT_CODE_RESIZED) {
+            resized = true;
+            event->flags.consumed = 1;
+            width = event->context.data.u16[0];
+            height = event->context.data.u16[1];
+            continue;
+
+            
+        }
+    }
+    if(resized){
+        engineState->width = width;
+        engineState->height = height;
         engineState->game_inst->on_resize(engineState->game_inst, engineState->width, engineState->height);
         rendererSignalResize();
-        return true;
     }
-
-    // Event purposely not handled to allow other listeners to get this.
-    return false;
 }
 
 void engine_on_event_system_initialized(void) {
     // Register for engine-level events.
-    eventRegister(EVENT_CODE_APPLICATION_QUIT, 0, engineOnEvent);
-    eventRegister(EVENT_CODE_RESIZED, 0, engineOnResized);
+    registerEventSink(EVENT_CODE_APPLICATION_QUIT, engineOnEvent);
+    registerEventSink(EVENT_CODE_RESIZED, engineOnResized);
+
+
 }
 

@@ -6,6 +6,7 @@
 #include <stdarg.h>
 #include <unistd.h>
 #include <AvUtils/avString.h>
+#include "../platform/platform.h"
 
 #define ANSI_COLOR_RED		"\x1b[31m"
 #define ANSI_COLOR_GREEN	"\x1b[32m"
