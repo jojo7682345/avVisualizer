@@ -103,7 +103,7 @@ bool8 engine_run(Application* game_inst) {
     // f64 running_time = 0;
     // TODO: frame rate lock
     // u8 frame_count = 0;
-    double target_frame_seconds = 1.0f / 60;
+    double target_frame_seconds = 1.0f / 120;
     double frame_elapsed_time = 0;
     
     systemsInitialize(game_inst);
@@ -190,7 +190,7 @@ bool8 engine_run(Application* game_inst) {
                 double remaining_ms = (remaining_seconds * 1000);
 
                 // If there is time left, give it back to the OS.
-                double limit_frames = false;
+                double limit_frames = true;
                 if (remaining_ms > 0 && limit_frames) {
                     platformSleep(remaining_ms - 1);
                 }

@@ -7,7 +7,7 @@ static bool my_tool_active = true;
 static float my_color[4];
 static bool show_demo_window = true;
 
-bool8 renderFrame(struct Application* app_inst){
+bool8 renderFrameCpp(struct Application* app_inst){
     ImGuiViewport* viewport = ImGui::GetMainViewport();
 
     ImGui::SetNextWindowPos(viewport->WorkPos);
@@ -73,7 +73,7 @@ bool8 renderFrame(struct Application* app_inst){
     return true;
 }
 
-bool8 initialize(struct Application* app_inst){
+bool8 initializeCpp(struct Application* app_inst){
     return true;
 }
 

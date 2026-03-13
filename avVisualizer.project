@@ -130,6 +130,7 @@ func buildTest(){
     ];
     var includes=[
         "engine/include",
+        "engine/src"
     ];
 
     var libDirs=[
