@@ -1,5 +1,5 @@
 #include <entry.h>
-#include <ecs/ecs.h>
+#include <ecs/ecsV2.h>
 
 extern bool8 renderFrameCpp(struct Application*);
 
@@ -7,12 +7,9 @@ extern bool8 initializeCpp(struct Application*);
 
 Scene scene = {0};
 
-EntityType ENTITY_TYPE_FOO = INVALID_ENTITY_TYPE;
-EntityType ENTITY_TYPE_BAR = INVALID_ENTITY_TYPE;
-
-ComponentID COMPONENT_TYPE_FOO = INVALID_COMPONENT_ID;
-ComponentID COMPONENT_TYPE_BAR = 5;
-ComponentID COMPONENT_TYPE_BAZ = INVALID_COMPONENT_ID;
+ComponentType COMPONENT_TYPE_FOO = INVALID_COMPONENT;
+ComponentType COMPONENT_TYPE_BAR = 5;
+ComponentType COMPONENT_TYPE_BAZ = INVALID_COMPONENT;
 
 typedef struct FooComponent {
     uint32 a;
@@ -23,40 +20,23 @@ typedef struct BarComponent {
     uint32 b;
 } BarComponent;
 
-void fooConstructor(Scene scene, Entity entity, void* component, uint32 size, va_list args){
-    ((FooComponent*)component)->a = va_arg(args, uint32);
+void fooConstructor(Scene scene, Entity entity, void* component, uint32 size,  ComponentInfo* info){
+    ((FooComponent*)component)->a = 2;
     avLog(AV_DEBUG, "Initialized foo component of entity %x, with %u", entity, ((FooComponent*)component)->a);
 }
 void fooDestructor(Scene scene, Entity entity, void* component, uint32 size){
     avLog(AV_DEBUG, "Uninitialized foo component of entity %x, with %u", entity, ((FooComponent*)component)->a);
 }
 
-void barConstructor(Scene scene, Entity entity, void* component, uint32 size, va_list args){
-    ((BarComponent*)component)->a = va_arg(args, uint32);
-    ((BarComponent*)component)->b = va_arg(args, uint32);
+void barConstructor(Scene scene, Entity entity, void* component, uint32 size, ComponentInfo* info){
+    ((BarComponent*)component)->a = 2;
+    ((BarComponent*)component)->b = 3;
     avLog(AV_DEBUG, "Initialized foo component of entity %x, with %u %u", entity, ((BarComponent*)component)->a, ((BarComponent*)component)->b);
 }
 void barDestructor(Scene scene, Entity entity, void* component, uint32 size){
     avLog(AV_DEBUG, "Uninitialized foo component of entity %x, with %u %u", entity, ((BarComponent*)component)->a, ((BarComponent*)component)->b);
 }
 
-void testFunc(Scene scene, const Entity entity, const uint32 componentCount, const ComponentID* componentIndex, const Component* component, const uint32* componentSizes){
-    for(uint32 i = 0; i < componentCount; i++){
-        if(componentIndex[i]==COMPONENT_TYPE_FOO){
-            ((FooComponent*)component[i])->a += 1;
-            avLog(AV_DEBUG, "Performed for entity FOO %x", entity);
-            continue;
-        }
-        if(componentIndex[i]==COMPONENT_TYPE_BAR){
-            ((BarComponent*)component[i])->b += 1;
-            ((BarComponent*)component[i])->a += 2;
-            avLog(AV_DEBUG, "Performed for entity BAR %x", entity);
-            continue;
-        }
-
-        
-    }
-}
 
 bool8 initialize(struct Application* app){
     initializeCpp(app);
@@ -66,23 +46,7 @@ bool8 initialize(struct Application* app){
     registerComponent(&COMPONENT_TYPE_BAR, sizeof(BarComponent), barConstructor, barDestructor);
     registerComponent(&COMPONENT_TYPE_BAZ, 0, NULL, NULL);
 
-    ComponentID barComponents[] = { COMPONENT_TYPE_FOO, COMPONENT_TYPE_BAR, COMPONENT_TYPE_BAZ };
-
-    ENTITY_TYPE_FOO = entityTypeCreate(scene, 1, &COMPONENT_TYPE_FOO);
-    ENTITY_TYPE_BAR = entityTypeCreate(scene, 2, barComponents);
-    Entity foo = entityCreate(scene, ENTITY_TYPE_FOO);
-    entityAddComponent(scene, foo, COMPONENT_TYPE_FOO, 15);
-
-    Entity bar[15];
-    for(uint32 i = 0; i < 15; i++){
-        bar[i] = entityCreate(scene, ENTITY_TYPE_BAR);
-        entityAddComponent(scene, bar[i], COMPONENT_TYPE_FOO, 20);
-        entityAddComponent(scene, bar[i], COMPONENT_TYPE_BAR, 1, 2);
-    }
-
-    entityRemoveComponent(scene, bar[2], COMPONENT_TYPE_FOO);
-
-    scenePerformForEntitiesMasked(scene, componentMaskMake(COMPONENT_TYPE_FOO, COMPONENT_TYPE_BAR), testFunc);
+    
 
     return true;
 }

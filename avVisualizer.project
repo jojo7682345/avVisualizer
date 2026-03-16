@@ -156,7 +156,7 @@ func buildTest(){
         binName = "test";
     }
     println("started compilation of testbed");
-    var objects = recompile(getSourceFiles(srcDir), "build", libflags, includes, additionalDependencies ); //+ ["bin/" + libName, "bin/" + libLnkName]
+    var objects = recompile(getSourceFiles(srcDir), "build", libflags, includes, additionalDependencies + ["bin/" + libName, "bin/" + libLnkName]);
     objects += recompile(getCppFiles(srcDir), "build", libflags, includes, additionalDependencies);
     if(requiresRelink("bin/" + binName, objects, additionalDependencies)){ // + ["bin/" + libName, "bin/" + libLnkName]
         makeDir("bin");
