@@ -31,10 +31,10 @@ void fooDestructor(Scene scene, Entity entity, void* component, uint32 size){
 void barConstructor(Scene scene, Entity entity, void* component, uint32 size, ComponentInfo* info){
     ((BarComponent*)component)->a = 2;
     ((BarComponent*)component)->b = 3;
-    avLog(AV_DEBUG, "Initialized foo component of entity %x, with %u %u", entity, ((BarComponent*)component)->a, ((BarComponent*)component)->b);
+    avLog(AV_DEBUG, "Initialized bar component of entity %x, with %u %u", entity, ((BarComponent*)component)->a, ((BarComponent*)component)->b);
 }
 void barDestructor(Scene scene, Entity entity, void* component, uint32 size){
-    avLog(AV_DEBUG, "Uninitialized foo component of entity %x, with %u %u", entity, ((BarComponent*)component)->a, ((BarComponent*)component)->b);
+    avLog(AV_DEBUG, "Uninitialized bar component of entity %x, with %u %u", entity, ((BarComponent*)component)->a, ((BarComponent*)component)->b);
 }
 
 
@@ -46,7 +46,36 @@ bool8 initialize(struct Application* app){
     registerComponent(&COMPONENT_TYPE_BAR, sizeof(BarComponent), barConstructor, barDestructor);
     registerComponent(&COMPONENT_TYPE_BAZ, 0, NULL, NULL);
 
-    
+    ComponentInfo bazInfo = {
+        .type = COMPONENT_TYPE_BAZ,
+        .next = NULL,
+    };
+    ComponentInfo barInfo = {
+        .type = COMPONENT_TYPE_BAR,
+        .next = &bazInfo,
+    };
+    ComponentInfo fooInfo = {
+        .type = COMPONENT_TYPE_FOO,
+        .next = &barInfo,
+    };
+
+    ComponentInfo singleFoo = {
+        .type = COMPONENT_TYPE_FOO,
+        .next = NULL,
+    };
+
+    Entity foo = entityCreate(scene, &fooInfo);
+    Entity bar = entityCreate(scene, &fooInfo);
+    Entity baz = entityCreate(scene, &fooInfo);
+
+    Entity a = entityCreate(scene, &barInfo);
+
+    entityDestroy(scene, foo);
+
+    foo = entityCreate(scene, &fooInfo);
+
+    entityAddComponent(scene, a, &singleFoo);
+    entityAddComponent(scene, a, &singleFoo);
 
     return true;
 }
