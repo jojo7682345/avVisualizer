@@ -1,5 +1,5 @@
 #include <entry.h>
-#include <ecs/ecsV2.h>
+#include <ecs/ecs.h>
 
 extern bool8 renderFrameCpp(struct Application*);
 
@@ -77,6 +77,8 @@ bool8 initialize(struct Application* app){
     entityAddComponent(scene, a, &singleFoo);
     entityAddComponent(scene, a, &singleFoo);
 
+    entityRemoveComponent(scene, a, COMPONENT_TYPE_FOO, 0);
+    //entityRemoveComponentType(scene, a, COMPONENT_TYPE_FOO);
     return true;
 }
 

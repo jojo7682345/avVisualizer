@@ -9,7 +9,7 @@ typedef struct darrayHeader {
     AvAllocator* allocator;
 } darrayHeader;
 
-void* _darrayCreate(uint64 length, uint64 stride, uint64 initLength, AvAllocator* allocator) {
+void* _darrayCreate(uint64 length, uint64 stride, uint64 initLength, AvAllocator* allocator, uint32 line, const char* func, const char* file) {
     uint64 headerSize = sizeof(darrayHeader);
     uint64 arraySize = length * stride;
     void* newArray = 0;
@@ -17,7 +17,7 @@ void* _darrayCreate(uint64 length, uint64 stride, uint64 initLength, AvAllocator
         newArray = avAllocatorAllocate(sizeof(headerSize + arraySize), allocator);
 
     } else {
-        newArray = avAllocate(headerSize + arraySize, "darray");
+        newArray = avAllocate_(headerSize + arraySize, "darray", line, func, file);
     }
     avMemset(newArray, 0, headerSize + arraySize);
     if (length == 0) {
@@ -50,7 +50,7 @@ void* _darrayResize(void* array) {
         avAssert(0, "_darray_resize called on an array with 0 capacity. This should not be possible.");
         return 0;
     }
-    void* temp = _darrayCreate((DARRAY_RESIZE_FACTOR * header->capacity), header->stride, 0, header->allocator);
+    void* temp = _darrayCreate((DARRAY_RESIZE_FACTOR * header->capacity), header->stride, 0, header->allocator, __LINE__, __func__, __FILE__);
 
     header = (darrayHeader*)((uint8*)array - headerSize);
     avMemcpy(temp, array, header->length * header->stride);

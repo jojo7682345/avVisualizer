@@ -1,6 +1,7 @@
-#include "ecsV2.h"
+#include "ecs.h"
 
 #include <AvUtils/avMemory.h>
+#include "logging.h"
 
 #define COMPONENT_REGISTRY_SIZE MAX_COMPONENT_COUNT
 typedef struct ComponentEntry {
@@ -20,7 +21,7 @@ typedef struct ComponentArray {
     uint32 count;
     uint32 capacity;
     uint32* index;
-    uint32* reference;
+    //uint32* reference;
     ComponentData data;
 } ComponentArray;
 
@@ -297,7 +298,7 @@ static uint32 createChunk(EntityType* type){
         if(MASK_HAS_COMPONENT(arrayMask, component)){
             size = sizeof(ComponentArray);
         }
-        chunk->components[index] = (Component) { avAllocate(size * CHUNK_CAPACITY, "") };
+        chunk->components[index] = (Component) { avAllocate((size!=0 ? size*CHUNK_CAPACITY : 1), "") };
         avMemset(chunk->components[index].single, 0, size);
         index++;
     }
@@ -307,6 +308,8 @@ static uint32 createChunk(EntityType* type){
         chunk->entities[i] = type->scene->entityCount++;
         chunk->localIndex[i] = i;
     }
+
+    avLog(AV_DEBUG_CREATE, "Chunk created with mask %llu", mask.bits[0]);
 
     return chunkID;
 }
@@ -318,11 +321,66 @@ static void destroyComponent(Scene scene, Entity entity, ComponentData data, Com
     }
 }
 
+static void deinitComponentArray(ComponentArray* array){
+    avFree(array->data);
+    avFree(array->index);
+    //avFree(array->reference);
+}
+
 static void destroyComponentArray(Scene scene, Entity entity, ComponentArray* array, ComponentType component){
     for(uint32 i = 0; i < array->count; i++){
         destroyComponent(scene, entity, (byte*)array->data + i*getComponentSize(component), component);
     }
-    avFree(array->data);
+    deinitComponentArray(array);
+}
+
+
+/*
+6
+[0][1][2][3][4][5]
+[a][b][c][d][e][f]
+
+remove 0
+
+5
+[1][2][3][4][0][5]
+[f][b][c][d][e][a]
+*/
+
+static void freeComponentArraySlot(ComponentArray* array, ComponentType component, uint32 index){
+    if(index >= array->count) return;
+    if(array == NULL) return;
+    if(array->count == 0) return;
+    uint32 size = getComponentSize(component);
+
+    uint32 localIndex = array->index[index];
+
+    uint32 lastIndex = array->count-1;
+
+    if(localIndex!=lastIndex){
+        byte* srcOffset = (byte*)array->data + size*lastIndex;
+        byte* dstOffset = (byte*) array->data + size*localIndex;
+        avMemcpy(dstOffset, srcOffset, size);
+
+        for(uint32 i = index; i < lastIndex - 1; i++){
+            array->index[i] = array->index[i+1];
+        }
+        array->index[lastIndex-1] = localIndex;
+    }
+    array->count--;
+
+}
+
+static void destroyArrayComponent(Scene scene, Entity entity, ComponentArray* array, ComponentType component, uint32 index){
+    if(array==NULL) return;
+    if(index >= array->count) return;
+    uint32 size = getComponentSize(component);
+
+    uint32 localIndex = array->index[index];
+    destroyComponent(scene, entity, (byte*)array->data + localIndex*size, component);
+
+    freeComponentArraySlot(array, component, index);
+
 }
 
 static void destroyChunk(EntityType* type, uint32 chunkID){
@@ -349,6 +407,7 @@ static void destroyChunk(EntityType* type, uint32 chunkID){
         index++;
     }
 
+    avLog(AV_DEBUG_DESTROY, "Chunk destroyed with mask %llu", mask.bits[0]);
     freeChunk(chunkID);
 }
 
@@ -368,7 +427,30 @@ static EntityType* createEntityType(Scene scene, ComponentMask mask, ComponentMa
     return type;
 }
 
-static bool32 destroyEntityType(EntityType* type){
+static void removeEntityType(EntityType* type){
+    if(type==NULL) return;
+    if(type->scene==NULL) return;
+    Scene scene = type->scene;
+    if(scene->entityTypeCount == 0) return;
+
+    EntityTypeID id = type->typeID;
+    if(id >= scene->entityTypeCapacity) return;
+    uint32 index = scene->entityTypeIndex[id];
+    if(index >= scene->entityTypeCount) return;
+    if(scene->entityTypes + index != type) return;
+
+    uint32 lastIndex = scene->entityTypeCount - 1;
+    EntityTypeID lastID = scene->entityTypeReference[lastIndex];
+
+    avMemcpy(&scene->entityTypes[index], &scene->entityTypes[lastIndex], sizeof(EntityType));
+    scene->entityTypeReference[index] = lastID;
+    scene->entityTypeReference[lastIndex] = id;
+    scene->entityTypeIndex[lastID] = index;
+    scene->entityTypeIndex[id] = lastIndex;
+    scene->entityTypeCount--;
+}
+
+static bool32 destroyEntityTypeChunks(EntityType* type){
     if(type==NULL) return false;
     if(type->scene==NULL) return false;
 
@@ -389,13 +471,11 @@ static bool32 destroyEntityType(EntityType* type){
         
     }
     if(type->chunks) avFree(type->chunks);
+}
 
-    avMemcpy(&scene->entityTypes[index], &scene->entityTypes[lastIndex], sizeof(EntityType));
-    scene->entityTypeReference[index] = lastID;
-    scene->entityTypeReference[lastIndex] = id;
-    scene->entityTypeIndex[lastID] = index;
-    scene->entityTypeIndex[id] = lastIndex;
-    scene->entityTypeCount--;
+static bool32 destroyEntityType(EntityType* type){
+    if(!destroyEntityTypeChunks(type)) return false;
+    removeEntityType(type);
     return true;
 }
 
@@ -414,13 +494,14 @@ Scene sceneCreate(){
 
 void sceneDestroy(Scene scene){
 
-    while(scene->entityTypeCount!=0){
+    for(uint32 i = 0; i < scene->entityTypeCount; i++){
         // as types are swapped after destruction the we can keep destroying the first element
-        destroyEntityType(&scene->entityTypes[0]);
+        destroyEntityTypeChunks(&scene->entityTypes[i]);
     }
     avFree(scene->entityTypes);
     avFree(scene->entityTypeReference);
     avFree(scene->entityTypeIndex);
+    avFree(scene->entityTable);
     avFree(scene);
 
 }
@@ -525,6 +606,39 @@ static uint32 getComponentIndex(ComponentMask mask, ComponentType type){
     return INVALID_COMPONENT;
 }
 
+static void initComponentArray(ComponentArray* array, ComponentType type){
+    uint32 size= getComponentSize(type);
+    if(array->data!=NULL || array->capacity!=0) return;
+
+    array->count = 0;
+    array->capacity = 2; // initial size of component array, as in creation at least 2 are always used
+    array->data = avAllocate(size * array->capacity, "");
+    array->index = avAllocate(sizeof(uint32)*array->capacity, "");
+    //array->reference = avAllocate(sizeof(uint32)*array->capacity, "");
+    array->index[0] = 0;
+    array->index[1] = 1;
+    //array->reference[0] = 0;
+    //array->reference[1] = 1;
+}
+
+static uint32 appendArraySlot(ComponentArray* array, ComponentType type){
+    uint32 size = getComponentSize(type);
+    if(array->data==NULL || array->capacity==0){
+        initComponentArray(array, type);
+    }
+    if(array->count >= array->capacity){
+        array->capacity *= 2;
+        array->data = avReallocate(array->data, size * array->capacity, "");
+        array->index = avReallocate(array->index, sizeof(uint32)*array->capacity, "");
+        //array->reference = avReallocate(array->reference, sizeof(uint32)*array->capacity, "");
+        for(uint32 i = array->capacity>>1; i < array->capacity; i++){
+            array->index[i] = i;
+            //array->reference[i] = i;
+        }
+    }
+    return array->index[array->count++];
+}
+
 static bool32 moveEntity(Scene scene, Entity src, Entity dst){
     if(scene==NULL) return false;
     if(src==INVALID_ENTITY || dst==INVALID_ENTITY) return false;
@@ -563,18 +677,90 @@ static bool32 moveEntity(Scene scene, Entity src, Entity dst){
     if(!swapEntities(scene, src, lastEntity)) return false;
     srcChunk->count--;
     
-    ComponentMask copyMask = componentMaskAnd(srcType->mask, dstType->mask);
-    ComponentMask arrayCopyMask = componentMaskAnd(srcType->arrayMask, dstType->arrayMask);
-    
-    ITERATE_MASK(copyMask, component){
+    // component -> none
+    // array -> none
+    // component -> component = copy
+    // array -> component = copy from array
+    // component -> array = create array and copy to array
+    // array -> array = copy
+    // none -> component = zero
+    // none -> array = zero
+
+
+    ComponentMask srcC = srcType->mask;
+    ComponentMask srcA = srcType->arrayMask;
+
+    ComponentMask dstC = dstType->mask;
+    ComponentMask dstA = dstType->arrayMask;
+
+    ComponentMask srcInvC = componentMaskInvert(srcC);
+    ComponentMask dstInvC = componentMaskInvert(dstC);
+
+    ComponentMask srcInvA = componentMaskInvert(srcA);
+    ComponentMask dstInvA = componentMaskInvert(dstA);
+
+    // ComponentMask compToNone = componentMaskAnd(componentMaskAnd(srcC, dstInvC), srcInvA);
+    // ComponentMask arrayToNone = componentMaskAnd(srcA, dstInvC);
+
+    ComponentMask compToComp = componentMaskAnd(componentMaskAnd(srcC, dstC), componentMaskAnd(srcInvA, dstInvA));
+    ComponentMask arrayToArray = componentMaskAnd(srcA, dstA);
+
+    ComponentMask arrayToComp = componentMaskAnd(srcA, componentMaskAnd(dstC, dstInvA));
+    ComponentMask compToArray = componentMaskAnd(componentMaskAnd(srcC, srcInvA), dstA);
+
+    ComponentMask noneToComp = componentMaskAnd(componentMaskAnd(dstC, srcInvC), dstInvA);
+    ComponentMask noneToArray = componentMaskAnd(dstA, srcInvC);
+
+    ComponentMask createArray = componentMaskOr(compToArray, noneToArray);
+    ComponentMask copyToArray = compToArray;
+    ComponentMask copyFromArray = arrayToComp;
+    ComponentMask rawCopy = componentMaskOr(compToComp, arrayToArray);
+    ComponentMask zeroMem = noneToComp;
+
+    ComponentMask mask = componentMaskOr(srcC, dstC);
+
+    ITERATE_MASK(createArray, component){
+        uint32 size = getComponentSize(component);
+        uint32 componentDstIndex = getComponentIndex(dstType->mask, component);
+        byte* dstOffset = ((byte*)dstChunk->components[componentDstIndex].single) + dstIndex*size;
+        initComponentArray((ComponentArray*) dstOffset, component);
+    }
+    ITERATE_MASK(copyToArray, component){
         uint32 size = getComponentSize(component);
         uint32 componentSrcIndex = getComponentIndex(srcType->mask, component);
         uint32 componentDstIndex = getComponentIndex(dstType->mask, component);
-
-        if(MASK_HAS_COMPONENT(arrayCopyMask, component)){
-            size = sizeof(ComponentArray);
-        }
-        avMemcpy(((byte*)dstChunk->components[componentDstIndex].single) + dstIndex*size, ((byte*)dstChunk->components[componentDstIndex].single) + srcIndex*size, size);
+        byte* srcOffset = ((byte*)srcChunk->components[componentSrcIndex].single) + srcIndex*size;
+        byte* dstOffset = ((byte*)dstChunk->components[componentDstIndex].single) + dstIndex*size;
+        ComponentArray* array = (ComponentArray*)dstOffset;
+        dstOffset = (byte*)array->data + appendArraySlot(array, component) * size;
+        avMemcpy(dstOffset, srcOffset, size);
+    }
+    ITERATE_MASK(copyFromArray, component){
+        uint32 size = getComponentSize(component);
+        uint32 componentSrcIndex = getComponentIndex(srcType->mask, component);
+        uint32 componentDstIndex = getComponentIndex(dstType->mask, component);
+        byte* srcOffset = ((byte*)srcChunk->components[componentSrcIndex].single) + srcIndex*size;
+        byte* dstOffset = ((byte*)dstChunk->components[componentDstIndex].single) + dstIndex*size;
+        ComponentArray* array = (ComponentArray*)srcOffset;
+        srcOffset = (byte*)array->data + array->index[0] * size;
+        avMemcpy(dstOffset, srcOffset, size);
+        deinitComponentArray(array);
+    }
+    ITERATE_MASK(rawCopy, component){
+        uint32 size = getComponentSize(component);
+        uint32 componentSrcIndex = getComponentIndex(srcType->mask, component);
+        uint32 componentDstIndex = getComponentIndex(dstType->mask, component);
+        byte* srcOffset = ((byte*)srcChunk->components[componentSrcIndex].single) + srcIndex*size;
+        byte* dstOffset = ((byte*)dstChunk->components[componentDstIndex].single) + dstIndex*size;
+        avMemcpy(dstOffset, srcOffset, size);
+    }
+    ITERATE_MASK(zeroMem, component){
+        uint32 size = getComponentSize(component);
+        uint32 componentSrcIndex = getComponentIndex(srcType->mask, component);
+        uint32 componentDstIndex = getComponentIndex(dstType->mask, component);
+        byte* srcOffset = ((byte*)srcChunk->components[componentSrcIndex].single) + srcIndex*size;
+        byte* dstOffset = ((byte*)dstChunk->components[componentDstIndex].single) + dstIndex*size;
+        avMemset(dstOffset, 0 , size);
     }
 
     dstChunk->entities[dstIndex] = src;
@@ -621,29 +807,7 @@ static void createComponent(Scene scene, Entity entity, ComponentData data, Comp
 
 static void createArrayComponent(Scene scene, Entity entity, ComponentArray* array, ComponentType type, ComponentInfo* info){
     uint32 size = getComponentSize(type);
-    if(array->data==NULL || array->capacity==0){
-        array->count = 0;
-        array->capacity = 2; // initial size of component array, as in creation at least 2 are always used
-        array->data = avAllocate(size * array->capacity, "");
-        array->index = avAllocate(sizeof(uint32)*array->capacity, "");
-        array->reference = avAllocate(sizeof(uint32)*array->capacity, "");
-        array->index[0] = 0;
-        array->index[1] = 1;
-        array->reference[0] = 0;
-        array->reference[1] = 1;
-    }
-    if(array->count >= array->capacity){
-        array->capacity *= 2;
-        array->data = avReallocate(array->data, size * array->capacity, "");
-        array->index = avReallocate(array->index, sizeof(uint32)*array->capacity, "");
-        array->reference = avReallocate(array->reference, sizeof(uint32)*array->capacity, "");
-        for(uint32 i = array->capacity>>1; i < array->capacity; i++){
-            array->index[i] = i;
-            array->reference[i] = i;
-        }
-    }
-
-    uint32 index = array->index[array->count++];
+    uint32 index = appendArraySlot(array, type);
     createComponent(scene, entity, (byte*)array->data + index*size, type, info);
 }
 static void performConstructorMasked(Scene scene, uint32 i, EntityChunk* chunk, EntityType* type, ComponentMask mask, ComponentInfo* info){
@@ -790,7 +954,7 @@ static bool32 entityChangeType(Scene scene, Entity entity, EntityType* dst, Comp
     return true;
 }
 
-AV_API Entity entityCreate(Scene scene, ComponentInfo* info){
+AV_API Entity entityCreate(Scene scene, ComponentInfoRef info){
 
     ComponentMask mask = {0};
     ComponentMask arrayMask = {0};
@@ -806,7 +970,6 @@ AV_API Entity entityCreate(Scene scene, ComponentInfo* info){
         }
     }
 
-
     Entity entity = createEntity(type);
 
     performConstructor(scene, getEntityLocalIndex(scene, entity), getEntityChunk(scene, entity), type, info);
@@ -814,7 +977,7 @@ AV_API Entity entityCreate(Scene scene, ComponentInfo* info){
     return entity;
 }
 
-AV_API bool32 entityAddComponent(Scene scene, Entity entity, ComponentInfo* info){
+AV_API bool32 entityAddComponent(Scene scene, Entity entity, ComponentInfoRef info){
     EntityType* type = getType(scene, entity);
     if(type==NULL){
         return false;
@@ -850,14 +1013,64 @@ AV_API bool32 entityAddComponent(Scene scene, Entity entity, ComponentInfo* info
     return entityChangeType(scene, entity, type, info);
 }
 
-AV_API bool32 entityRemoveComponent(Scene scene, Entity entity, ComponentType type, uint32 index){
+AV_API bool32 entityRemoveComponent(Scene scene, Entity entity, ComponentType component, uint32 index){
+    EntityType* type = getType(scene, entity);
+    if(type==NULL){
+        return false;
+    }
+    if(!MASK_HAS_COMPONENT(type->mask, component)) return false;
+
+    if(!MASK_HAS_COMPONENT(type->arrayMask, component)){
+        if(index != 0) return false;
+        return entityRemoveComponentType(scene, entity, component);
+    }
+    uint32 componentIndex = getComponentIndex(type->mask, component);
+    // get size of array
+    EntityChunk* chunk = getEntityChunk(scene, entity);
+    uint32 localIndex = getEntityLocalIndex(scene, entity);
+
+    ComponentArray* array = chunk->components[componentIndex].array + localIndex;
+    if(array->count == 2){
+        if(index >= 2) return false;
 
 
+        ComponentMask newArrayMask = type->arrayMask;
+        MASK_REMOVE_COMPONENT(newArrayMask, component);
+        type = findEntityType(scene, type->mask, newArrayMask);
+        if(type==NULL){
+            type = createEntityType(scene, type->mask, newArrayMask);
+            if(type==NULL){
+                return false;
+            }
+        }
 
+        destroyArrayComponent(scene, entity, array, component, index);
+        return entityChangeType(scene, entity, type, NULL);
+    }
 
+    destroyArrayComponent(scene, entity, array, component, index);
+    return true;
 }
 
-AV_API bool32 entityRemoveComponentType(Scene scene, Entity entity, ComponentType type){
+AV_API bool32 entityRemoveComponentType(Scene scene, Entity entity, ComponentType component){
+    EntityType* type = getType(scene, entity);
+    if(type==NULL){
+        return false;
+    }
+    if(!MASK_HAS_COMPONENT(type->mask, component)) return false;
+    ComponentMask newMask = type->mask;
+    ComponentMask newArrayMask = type->mask;
+    MASK_REMOVE_COMPONENT(newMask, component);
+    MASK_REMOVE_COMPONENT(newArrayMask, component);
+
+    type = findEntityType(scene, newMask, newArrayMask);
+    if(type==NULL){
+        type = createEntityType(scene, newMask, newArrayMask);
+        if(type==NULL){
+            return false;
+        }
+    }
+    return entityChangeType(scene, entity, type, NULL);
 
 }
 

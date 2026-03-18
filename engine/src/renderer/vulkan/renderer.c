@@ -1187,6 +1187,7 @@ bool8 rendererStartup(uint64* memoryRequirement, void* statePtr, void* config){
             avFatal("Failed to allocate descriptor sets");
             return false;
         }
+        darrayDestroy(layouts);
 
         for(uint32 i = 0; i < state->imageCount; i++){
             VkDescriptorBufferInfo bufferInfo = {0};
@@ -1350,28 +1351,36 @@ void rendererShutdown(void* statePtr){
 
     cleanupSwapchain();
 
+    
     for(uint32 i = 0; i < state->imageCount; i++){
         vkDestroyBuffer(state->device, state->uniformBuffers[i], NULL);
         vkFreeMemory(state->device, state->uniformBuffersMemory[i], NULL);
     }
+    darrayDestroy(state->uniformBuffers);
+    darrayDestroy(state->uniformBuffersMapped);
+    darrayDestroy(state->uniformBuffersMemory);
+    
     vkDestroyBuffer(state->device, state->indexBuffer, NULL);
     vkFreeMemory(state->device, state->indexBufferMemory, NULL);
     vkDestroyBuffer(state->device, state->vertexBuffer, NULL);
     vkFreeMemory(state->device, state->vertexBufferMemory, NULL);
-
+    
     for(uint32 i = 0; i < state->imageCount; i++){
         vkDestroySemaphore(state->device, state->imageAvailableSemaphore[i], NULL);
         vkDestroySemaphore(state->device, state->renderFinishedSemaphore[i], NULL);
         vkDestroyFence(state->device, state->inFlightFence[i], NULL);
     }
-
+    
     darrayDestroy(state->renderFinishedSemaphore);
     darrayDestroy(state->imageAvailableSemaphore);
     darrayDestroy(state->inFlightFence);
-
+    
     vkDestroyCommandPool(state->device, state->commandPool, NULL);
+    darrayDestroy(state->commandBuffer);
+
 
     vkDestroyDescriptorPool(state->device, state->descriptorPool, NULL);
+    darrayDestroy(state->descriptorSets);
     vkDestroyDescriptorSetLayout(state->device, state->descriptorSetLayout, NULL);
 
     vkDestroyPipeline(state->device, state->graphicsPipeline, NULL);
@@ -1385,6 +1394,7 @@ void rendererShutdown(void* statePtr){
     vkDestroySurfaceKHR(state->instance, state->surface, NULL);
     if(state->debugMessenger){
         destroyDebugUtilsMessengerEXT(state->instance, *state->debugMessenger, NULL);
+        avFree(state->debugMessenger);
     }
     vkDestroyInstance(state->instance, NULL);
 }
@@ -1441,5 +1451,8 @@ void testFunc(){
     info.vertexInputAttributes = attributeDescriptions;
 
     bool32 ret = loadShader(state->device, info, &shader);
+
+    avFree(fragmentCode);
+    avFree(vertexCode);
     
 }

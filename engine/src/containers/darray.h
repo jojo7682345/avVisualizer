@@ -31,7 +31,7 @@ struct frame_allocator_int;
  * @param stride The size of each array element.
  * @returns A pointer representing the block of memory containing the array.
  */
-AV_API void* _darrayCreate(uint64 length, uint64 stride, uint64 initLength, AvAllocator* frameAllocator);
+AV_API void* _darrayCreate(uint64 length, uint64 stride, uint64 initLength, AvAllocator* frameAllocator, uint32 line, const char* func, const char* file);
 
 /**
  * @brief Resizes the given array using internal resizing amounts.
@@ -75,7 +75,7 @@ AV_API void* _darrayInsertAt(void* array, uint64 index, void* value_ptr);
  * @returns A pointer to the array's memory block.
  */
 #define darrayCreate(type) \
-    _darrayCreate(DARRAY_DEFAULT_CAPACITY, sizeof(type), 0, 0)
+    _darrayCreate(DARRAY_DEFAULT_CAPACITY, sizeof(type), 0, 0, __LINE__, __func__, __FILE__)
 
 /**
  * @brief Creates a new darray of the given type with the default capacity.
@@ -85,10 +85,10 @@ AV_API void* _darrayInsertAt(void* array, uint64 index, void* value_ptr);
  * @returns A pointer to the array's memory block.
  */
 #define darrayCreateWithAllocator(type, allocator) \
-    _darrayCreate(DARRAY_DEFAULT_CAPACITY, sizeof(type), 0, allocator)
+    _darrayCreate(DARRAY_DEFAULT_CAPACITY, sizeof(type), 0, allocator, __LINE__, __func__, __FILE__)
 
 #define darrayCreateSized(type, size) \
-    _darrayCreate((size), sizeof(type), (size), 0)
+    _darrayCreate((size), sizeof(type), (size), 0, __LINE__, __func__, __FILE__)
 
 /**
  * @brief Creates a new darray of the given type with the provided capacity.
@@ -98,7 +98,7 @@ AV_API void* _darrayInsertAt(void* array, uint64 index, void* value_ptr);
  * @returns A pointer to the array's memory block.
  */
 #define darrayReserve(type, capacity) \
-    _darrayCreate(capacity, sizeof(type), 0, 0)
+    _darrayCreate(capacity, sizeof(type), 0, 0, __LINE__, __func__, __FILE__)
 
 /**
  * @brief Creates a new darray of the given type with the provided capacity.
@@ -109,7 +109,7 @@ AV_API void* _darrayInsertAt(void* array, uint64 index, void* value_ptr);
  * @returns A pointer to the array's memory block.
  */
 #define darrayReserveWithAllocator(type, capacity, allocator) \
-    _darrayCreate(capacity, sizeof(type), 0, allocator)
+    _darrayCreate(capacity, sizeof(type), 0, allocator, __LINE__, __func__, __FILE__)
 
 /**
  * @brief Destroys the provided array, freeing any memory allocated by it.

@@ -79,7 +79,8 @@ func buildLib(){
     var libflags=[
         "-ggdb",
         "-MMD",
-        "-DAV_EXPORT"
+        "-DAV_EXPORT",
+        "-DAV_DEBUG_ALLOC"
     ];
     var includes=[
         "engine/include",
@@ -126,7 +127,8 @@ func buildLib(){
 func buildTest(){
     var libflags=[
         "-ggdb",
-        "-MMD"
+        "-MMD",
+        "-DAV_DEBUG_ALLOC"
     ];
     var includes=[
         "engine/include",

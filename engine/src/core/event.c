@@ -100,6 +100,8 @@ void eventSystemShutdown(void* statePtr){
     avFree(state->registeredEvents);
     for(uint32 i = 0; i < darrayLength(state->pipelines); i++){
         avMutexDestroy(state->pipelines[i].mutex);
+        darrayDestroy(state->pipelines[i].stageIndex);
+        darrayDestroy(state->pipelines[i].stages);
     }
     darrayDestroy(state->pipelines);
     avRWLockDestroy(state->eventLock);

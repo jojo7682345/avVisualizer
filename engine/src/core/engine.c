@@ -50,19 +50,22 @@ bool8 engine_create(Application* game_inst) {
 
 // static void engineOnEvent(uint16 code, void* sender, void* listener_inst, EventContext context);
 
-
+void* eventMem = NULL;
+void* inputMem = NULL;
+void* platformMem = NULL;
+void* rendererMem = NULL;
 bool8 systemsInitialize(Application* game_inst){
     EventSystemConfig eventConfig = {0};
     eventConfig.maxIDs = 0xffff;
     uint64 memSize = 0;
     eventSystemInitialize(&memSize, 0, &eventConfig);
-    void* eventMem = avAllocate(memSize, "");
+    eventMem = avAllocate(memSize, "");
     eventSystemInitialize(&memSize, eventMem, &eventConfig);
 
     engine_on_event_system_initialized();
     
     inputSystemInitialize(&memSize, 0, 0);
-    void* inputMem = avAllocate(memSize, "");
+    inputMem = avAllocate(memSize, "");
     inputSystemInitialize(&memSize, inputMem, 0);
 
     platformSystemConfig platformSystemConfig = {
@@ -77,7 +80,7 @@ bool8 systemsInitialize(Application* game_inst){
     engineState->height = game_inst->appConfig.startHeight;
 
     platformSystemStartup(&memSize, 0, &platformSystemConfig);
-    void* platformMem = avAllocate(memSize, "");
+    platformMem = avAllocate(memSize, "");
     platformSystemStartup(&memSize, platformMem, &platformSystemConfig);
 
     RendererConfig rendererConfig = {
@@ -90,9 +93,20 @@ bool8 systemsInitialize(Application* game_inst){
     };
 
     rendererStartup(&memSize, 0, &rendererConfig);
-    void* rendererMem = avAllocate(memSize, "");
+    rendererMem = avAllocate(memSize, "");
     rendererStartup(&memSize, rendererMem, &rendererConfig);
 
+}
+
+void systemsUninitialize(){
+    inputSystemShutdown(inputMem);
+    avFree(inputMem);
+    eventSystemShutdown(eventMem);
+    avFree(eventMem);
+    platformSystemShutdown(platformMem);
+    avFree(platformMem);
+    rendererShutdown(rendererMem);
+    avFree(rendererMem);
 }
 
 bool8 engine_run(Application* game_inst) {
@@ -211,8 +225,6 @@ bool8 engine_run(Application* game_inst) {
         }
     }
 
-    rendererShutdown(0);
-
     engineState->is_running = false;
 
     // Shut down the game.
@@ -224,7 +236,8 @@ bool8 engine_run(Application* game_inst) {
     //inputSystemShutdown(inputMem);
 
     //platformSystemShutdown(platformMem);
-
+    systemsUninitialize();
+    avFree(engineState);
     return true;
 }
 
