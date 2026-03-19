@@ -76,9 +76,13 @@ bool8 initialize(struct Application* app){
 
     entityAddComponent(scene, a, &singleFoo);
     entityAddComponent(scene, a, &singleFoo);
-
-    entityRemoveComponent(scene, a, COMPONENT_TYPE_FOO, 0);
+    entityAddComponent(scene, a, &singleFoo);
+    entityAddComponent(scene, a, &singleFoo);
+    
+    entityRemoveComponent(scene, a, COMPONENT_TYPE_FOO, 2);
     //entityRemoveComponentType(scene, a, COMPONENT_TYPE_FOO);
+
+    avLog(AV_DEBUG, "Entity %x has %u foo components", a, entityGetComponentCount(scene, a, COMPONENT_TYPE_FOO));
     return true;
 }
 

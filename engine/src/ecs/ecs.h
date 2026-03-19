@@ -65,3 +65,19 @@ AV_API bool32 entityAddComponent(Scene scene, Entity entity, ComponentInfoRef in
 AV_API bool32 entityRemoveComponent(Scene scene, Entity entity, ComponentType type, uint32 index);
 AV_API bool32 entityRemoveComponentType(Scene scene, Entity entity, ComponentType type);
 AV_API bool32 entityDestroy(Scene scene, Entity entity);
+
+AV_API uint32 entityGetComponentCount(Scene scene, Entity entity, ComponentType type);
+
+// NOTE: pointer does not remain valid after any changes to this or other entities
+AV_API void* entityGetComponentRead(Scene scene, Entity entity, ComponentType type, uint32 index);
+// NOTE: pointer does not remain valid after any changes to this or other entities
+// All checks are removed for speed
+AV_API void* entityGetComponentReadFast(Scene scene, Entity entity, ComponentType type, uint32 index);
+
+// NOTE: pointer does not remain valid after any changes to this or other entities
+AV_API void* entityGetComponentWrite(Scene scene, Entity entity, ComponentType type, uint32 index);
+// NOTE: pointer does not remain valid after any changes to this or other entities
+// All checks are removed for speed
+AV_API void* entityGetComponentWriteFast(Scene scene, Entity entity, ComponentType type, uint32 index);
+
+
