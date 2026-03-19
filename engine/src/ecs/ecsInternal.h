@@ -1,0 +1,98 @@
+#include "ecs.h"
+
+#include <AvUtils/avMemory.h>
+#include <AvUtils/threading/avRwLock.h>
+#include "logging.h"
+
+#include <stdatomic.h>
+
+#define COMPONENT_REGISTRY_SIZE MAX_COMPONENT_COUNT
+typedef struct ComponentEntry {
+	uint32 size;
+    ComponentConstructor constructor;
+    ComponentDestructor destructor;
+} ComponentEntry;
+
+typedef struct ComponentRegistry {
+	ComponentMask registeredComponents;
+	ComponentEntry entries[COMPONENT_REGISTRY_SIZE];
+} ComponentRegistry;
+
+static ComponentRegistry componentRegistry = {0};
+
+typedef struct ComponentArray {
+    uint32 count;
+    uint32 capacity;
+    uint32* index;
+    //uint32* reference;
+    ComponentData data;
+} ComponentArray;
+
+typedef union {
+    ComponentData single;
+    ComponentArray* array;
+} Component;
+
+typedef Entity LocalEntity;
+
+#define INVALID_ENTITY_TYPE ((EntityTypeID)-1)
+#define ENTITY_ID_RESERVED ((Entity)-2)
+
+
+#define ENTITY_LOCAL_INDEX(entity) ((entity) & 0xff)
+#define ENTITY_CHUNK(entity) (((entity) & ((MAX_CHUNKS-1)<<8))>>8)
+#define ENTITY(chunk, index) (((chunk & 0xffff)<<8) | ((index) & 0xff))
+#define ENTITY_GENERATION(entity) (((entity) >> 24) & 0xff)
+#define ENTITY_INDEX(entity) ((entity) & 0xffffff)
+
+#define GLOBAL_ENTITY(generation, entity) ((((generation)&0xff)<<24)|((entity)&0xffffff))
+
+#define CHUNK_CAPACITY 5 //256
+typedef struct EntityChunk {
+    Component components[COMPONENT_REGISTRY_SIZE];
+    Entity entities[CHUNK_CAPACITY];
+    EntityTypeID entityType;
+    uint32 count;
+    uint8 localIndex[CHUNK_CAPACITY];
+    uint8 localID[CHUNK_CAPACITY];
+} EntityChunk;
+
+#define MAX_CHUNKS 65536
+typedef struct ChunkPool {
+    uint32 chunkCount;
+    EntityChunk chunks[MAX_CHUNKS];
+    uint32 chunkIndex[MAX_CHUNKS];
+    uint32 chunkReference[MAX_CHUNKS];
+    bool8 initialized;
+} ChunkPool;
+
+typedef struct EntityType {
+    ComponentMask mask; // order of components is specified in order of mask
+    ComponentMask arrayMask;
+    uint16 componentIndex[MAX_COMPONENT_COUNT];
+    uint32 chunkCount;
+    uint32 chunkCapacity;
+    uint32* chunks;
+    EntityTypeID typeID;
+    Scene scene;
+}EntityType;
+
+struct Scene {
+    uint32 entityTypeCapacity;
+    uint32 entityTypeCount;
+    uint32* entityTypeIndex;
+    EntityTypeID* entityTypeReference;
+    EntityType* entityTypes;
+
+    AvRwLock entityIdLock;
+    uint32 entityCapacity; // capacity of entity ids
+    uint32 entityMaxCount; // increases with every chunk allocated
+    _Atomic uint32 entityCount; // number of entities
+    _Atomic Entity* entityTable; // SceneEntity -> ChunkEntity
+    uint8* entityGeneration;
+    //Entity* entityReference;
+};
+
+uint32 getComponentSize(ComponentType component);
+ComponentConstructor getComponentConstructor(ComponentType component);
+ComponentDestructor getComponentDestructor(ComponentType component);

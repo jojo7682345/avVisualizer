@@ -1,97 +1,7 @@
-#include "ecs.h"
+#include "ecsInternal.h"
+#include "ecsStaging.h"
 
-#include <AvUtils/avMemory.h>
-#include <AvUtils/threading/avRwLock.h>
-#include "logging.h"
 
-#include <stdatomic.h>
-
-#define COMPONENT_REGISTRY_SIZE MAX_COMPONENT_COUNT
-typedef struct ComponentEntry {
-	uint32 size;
-    ComponentConstructor constructor;
-    ComponentDestructor destructor;
-} ComponentEntry;
-
-typedef struct ComponentRegistry {
-	ComponentMask registeredComponents;
-	ComponentEntry entries[COMPONENT_REGISTRY_SIZE];
-} ComponentRegistry;
-
-static ComponentRegistry componentRegistry = {0};
-
-typedef struct ComponentArray {
-    uint32 count;
-    uint32 capacity;
-    uint32* index;
-    //uint32* reference;
-    ComponentData data;
-} ComponentArray;
-
-typedef union {
-    ComponentData single;
-    ComponentArray* array;
-} Component;
-
-typedef Entity LocalEntity;
-
-#define INVALID_ENTITY_TYPE ((EntityTypeID)-1)
-
-#define ENTITY_LOCAL_INDEX(entity) ((entity) & 0xff)
-#define ENTITY_CHUNK(entity) (((entity) & ((MAX_CHUNKS-1)<<8))>>8)
-#define ENTITY(chunk, index) (((chunk & 0xffff)<<8) | ((index) & 0xff))
-#define ENTITY_GENERATION(entity) (((entity) >> 24) & 0xff)
-#define ENTITY_INDEX(entity) ((entity) & 0xffffff)
-
-#define GLOBAL_ENTITY(generation, entity) ((((generation)&0xff)<<24)|((entity)&0xffffff))
-
-#define CHUNK_CAPACITY 5 //256
-typedef struct EntityChunk {
-    Component components[COMPONENT_REGISTRY_SIZE];
-    Entity entities[CHUNK_CAPACITY];
-    EntityTypeID entityType;
-    uint32 count;
-    uint8 localIndex[CHUNK_CAPACITY];
-    uint8 localID[CHUNK_CAPACITY];
-} EntityChunk;
-
-#define MAX_CHUNKS 65536
-typedef struct ChunkPool {
-    uint32 chunkCount;
-    EntityChunk chunks[MAX_CHUNKS];
-    uint32 chunkIndex[MAX_CHUNKS];
-    uint32 chunkReference[MAX_CHUNKS];
-    bool8 initialized;
-} ChunkPool;
-
-typedef struct EntityType {
-    ComponentMask mask; // order of components is specified in order of mask
-    ComponentMask arrayMask;
-    uint16 componentIndex[MAX_COMPONENT_COUNT];
-    uint32 chunkCount;
-    uint32 chunkCapacity;
-    uint32* chunks;
-    EntityTypeID typeID;
-    Scene scene;
-}EntityType;
-
-struct Scene {
-    uint32 entityTypeCapacity;
-    uint32 entityTypeCount;
-    uint32* entityTypeIndex;
-    EntityTypeID* entityTypeReference;
-    EntityType* entityTypes;
-
-    AvRwLock entityIdLock;
-    uint32 entityCapacity; // capacity of entity ids
-    uint32 entityMaxCount; // increases with every chunk allocated
-    _Atomic uint32 entityCount; // number of entities
-    _Atomic Entity* entityTable; // SceneEntity -> ChunkEntity
-    uint8* entityGeneration;
-    //Entity* entityReference;
-};
-
-#define ENTITY_ID_RESERVED ((Entity)-2)
 // the slot reserved is set to ENTITY_ID_RESERVED
 // and should be imediately set to the correct value, 
 // as the id is not checked for the reserved case (will segfault)
@@ -108,7 +18,7 @@ static Entity allocateEntityID(Scene scene){
             scene->entityGeneration = avReallocate(scene->entityGeneration, sizeof(uint8)*scene->entityCapacity, "");
             for(uint32 i = oldCapacity; i < scene->entityCapacity; i++){
                 scene->entityTable[i] = INVALID_ENTITY;
-                scene->entityGeneration[i] = (uint8)-1;
+                scene->entityGeneration[i] = (uint8)~(ENTITY_STAGED_BIT>>24);
             }
         }
         avRWLockWriteUnlock(scene->entityIdLock);
@@ -183,29 +93,29 @@ static bool32 isComponentRegistered(ComponentType component){
     return MASK_HAS_COMPONENT(componentRegistry.registeredComponents, component);
 }
 
-static inline uint32 getComponentSize(ComponentType component){
+uint32 getComponentSize(ComponentType component){
     if(!isComponentRegistered(component)) return 0;
     return componentRegistry.entries[component].size;
 }
 
-static inline ComponentConstructor getComponentConstructor(ComponentType component){
+ComponentConstructor getComponentConstructor(ComponentType component){
     if(!isComponentRegistered(component)) return NULL;
     return componentRegistry.entries[component].constructor;
 }
 
-static inline ComponentDestructor getComponentDestructor(ComponentType component){
+ComponentDestructor getComponentDestructor(ComponentType component){
     if(!isComponentRegistered(component)) return NULL;
     return componentRegistry.entries[component].destructor;
 }
 
-bool32 componentMaskContains(ComponentMask mask, ComponentMask componentMask){
+AV_API bool32 componentMaskContains(ComponentMask mask, ComponentMask componentMask){
     for(uint32 i = 0; i < COMPONENT_MASK_SIZE; i++) {
         if((mask.bits[i] & componentMask.bits[i]) != componentMask.bits[i]) return 0;
     }
     return 1;
 }
 
-bool32 componentMaskEquals(ComponentMask maskA, ComponentMask maskB){
+AV_API bool32 componentMaskEquals(ComponentMask maskA, ComponentMask maskB){
     for(uint32 i = 0; i < COMPONENT_MASK_SIZE; i++){
         if(maskA.bits[i] != maskB.bits[i]) return false;
     }
@@ -234,6 +144,14 @@ AV_API ComponentMask componentMaskInvert(ComponentMask mask){
     return componentMaskAnd(mask, componentRegistry.registeredComponents);
 }
 
+AV_API uint32 componentMaskCount(ComponentMask mask){
+    uint32 count = 0;
+    for(uint32 i = 0; i < COMPONENT_MASK_SIZE; i++){
+        count += __builtin_popcountll(mask.bits[i]);
+    }
+    return count;
+}
+
 static ChunkPool chunkPool;
 static void initChunkPool(){
     chunkPool.chunkCount = 0;
@@ -246,7 +164,7 @@ static void initChunkPool(){
     chunkPool.initialized = true;
 }
 
-uint32 allocateChunk(Scene scene){
+static uint32 allocateChunk(Scene scene){
     if(chunkPool.initialized==false){
         initChunkPool();
     }
@@ -262,7 +180,7 @@ uint32 allocateChunk(Scene scene){
     return chunkPool.chunkReference[index];
 }
 
-uint32 getChunkID(EntityChunk* chunk){
+static uint32 getChunkID(EntityChunk* chunk){
     if(chunk==NULL)return MAX_CHUNKS;
     uint32 chunkIndex = chunk - chunkPool.chunks;
     if(chunkIndex >= chunkPool.chunkCount) return MAX_CHUNKS;
@@ -277,7 +195,7 @@ static EntityChunk* getChunk(uint32 chunkID){
 }
 
 static EntityChunk* getLocalEntityChunk(Entity localEntity){
-    if(localEntity==INVALID_ENTITY || localEntity==ENTITY_ID_RESERVED) return NULL;
+    if(localEntity==INVALID_ENTITY || localEntity==ENTITY_ID_RESERVED || localEntity & ENTITY_STAGED_BIT) return NULL;
     return &chunkPool.chunks[ENTITY_CHUNK(localEntity)];
 }
 
@@ -286,14 +204,14 @@ static EntityChunk* getEntityChunk(Scene scene, Entity entity){
     uint32 index = ENTITY_INDEX(entity);
     avRWLockReadLock(scene->entityIdLock);
     Entity localEntity = scene->entityTable[index];
-    uint32 generation = scene->entityGeneration[index];
+    uint32 generation = scene->entityGeneration[index] & ~ENTITY_STAGED_BIT;
     avRWLockReadUnlock(scene->entityIdLock);
-    if(generation != ENTITY_GENERATION(entity)) return NULL;
+    if(generation !=  (ENTITY_GENERATION(entity) & ~ENTITY_STAGED_BIT)) return NULL;
     return getLocalEntityChunk(localEntity);
 }
 
 static uint32 getLocalEntityLocalIndex(Entity localEntity){
-    if(localEntity==INVALID_ENTITY || localEntity==ENTITY_ID_RESERVED) return 0;
+    if(localEntity==INVALID_ENTITY || localEntity==ENTITY_ID_RESERVED || localEntity & ENTITY_STAGED_BIT) return 0;
     return ENTITY_LOCAL_INDEX(localEntity);
 }
 
@@ -302,9 +220,9 @@ static uint32 getEntityLocalIndex(Scene scene, Entity entity){
     uint32 index = ENTITY_INDEX(entity);
     avRWLockReadLock(scene->entityIdLock);
     Entity localEntity = scene->entityTable[index];
-    uint32 generation = scene->entityGeneration[index];
+    uint32 generation = scene->entityGeneration[index] & ~ENTITY_STAGED_BIT;
     avRWLockReadUnlock(scene->entityIdLock);
-    if(scene->entityGeneration[index] != ENTITY_GENERATION(entity)) return NULL;
+    if(generation != (ENTITY_GENERATION(entity) & ~ENTITY_STAGED_BIT)) return NULL;
     return getLocalEntityLocalIndex(localEntity);
 }
 
@@ -312,7 +230,7 @@ static Entity getEntity(uint32 chunkID, uint32 localIndex){
     return getChunk(chunkID)->entities[localIndex];
 }
 
-void freeChunk(uint32 chunkID){
+static void freeChunk(uint32 chunkID){
     if(chunkPool.chunkCount == 0){
         return;
     }
@@ -576,7 +494,7 @@ static EntityType* createEntityType(Scene scene, ComponentMask mask, ComponentMa
     return type;
 }
 
-Scene sceneCreate(){
+AV_API Scene sceneCreate(){
     Scene scene = avAllocate(sizeof(struct Scene), "");
     avMemset(scene, 0, sizeof(struct Scene));
     scene->entityTypeCapacity = 1;
@@ -591,12 +509,12 @@ Scene sceneCreate(){
     scene->entityTable = avAllocate(sizeof(Entity)*scene->entityCapacity, "");
     scene->entityTable[0] = INVALID_ENTITY;
     scene->entityGeneration = avAllocate(sizeof(uint8)*scene->entityCapacity, "");
-    scene->entityGeneration[0] = (uint8)-1;
+    scene->entityGeneration[0] = (uint8) ~(ENTITY_STAGED_BIT>>24);
     avRWLockCreate(&scene->entityIdLock);
     return scene;
 }
 
-void sceneDestroy(Scene scene){
+AV_API void sceneDestroy(Scene scene){
 
     uint32 typeCount = scene->entityTypeCount;
     for(uint32 i = 0; i < typeCount; i++){
@@ -1066,7 +984,8 @@ static Entity createEntity(EntityType* type){
     Entity globalEntity = allocateEntityID(type->scene);
     avRWLockReadLock(type->scene->entityIdLock);
     // we can alter the generation and table without write lock as we have soul ownership
-    uint8 generation = ++type->scene->entityGeneration[globalEntity];
+    type->scene->entityGeneration[globalEntity] = (type->scene->entityGeneration[globalEntity]+1) & (~ENTITY_STAGED_BIT);
+    uint8 generation = type->scene->entityGeneration[globalEntity];
     type->scene->entityTable[globalEntity] = localEntity;
     avRWLockReadUnlock(type->scene->entityIdLock);
 

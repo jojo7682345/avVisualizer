@@ -43,6 +43,7 @@ AV_API bool32 componentMaskEquals(ComponentMask maskA, ComponentMask maskB);
 AV_API ComponentMask componentMaskAnd(ComponentMask maskA, ComponentMask maskB);
 AV_API ComponentMask componentMaskOr(ComponentMask maskA, ComponentMask maskB);
 AV_API ComponentMask componentMaskInvert(ComponentMask mask);
+AV_API uint32 componentMaskCount(ComponentMask mask);
 
 typedef struct Scene* Scene;
 typedef void* ComponentData;
