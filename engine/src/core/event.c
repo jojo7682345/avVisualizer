@@ -410,7 +410,7 @@ static void dispatchEvents(struct DispatchInfo* dispatch){
 
 
 bool32 eventsDispatch(){
-    while(state->eventsPending){
+    if(state->eventsPending){
         darrayLengthSet(dispatchBuffer, 0); // clear batches from previous dispatch
         darrayLengthSet(eventStageBuffer, 0);
         avRWLockWriteLock(state->eventLock);

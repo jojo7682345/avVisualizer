@@ -1,10 +1,14 @@
 #include "ecsStaging.h"
 
+#include "containers/darray.h"
+#include <AvUtils/threading/avMutex.h>
 
 typedef enum CommandType {
+    CMD_NOP,
     CMD_CREATE_ENTTIY,
     CMD_DESTROY_ENTITY,
     CMD_ADD_COMPONENT,
+    CMD_MODIFY_COMPONENT,
     CMD_REMOVE_COMPONENT,
 } CommandType;
 
@@ -23,15 +27,11 @@ typedef struct Command {
     };
 } Command;
 
-typedef struct CommandBuffer {
-    Command* data;
-    uint32 count;
-    uint32 capacity;
-} CommandBuffer;
-
 typedef struct StagedComponent{
     ComponentType type;
     Entity entity;
+    uint32 lastModifiedCommandIndex;
+    bool32 isClone;
     byte* data;
 } StagedComponent;
 
@@ -45,32 +45,59 @@ typedef struct StagedComponentArray{
 typedef struct StagedEntity {
     ComponentMask mask;
     ComponentMask arrayMask;
+    uint32 createCommandIndex;
     Entity ID;
     union {
-        StagedComponent single;
-        StagedComponentArray array;   
+        StagedComponent* single;
+        StagedComponentArray* array;   
     }* components[MAX_COMPONENT_COUNT];
 }StagedEntity;
 
-
-
+#define MAPPING_RANGE_COUNT (4)
+#define MAPPING_BLOCK_COUNT (MAX_COMPONENT_COUNT*MAPPING_RANGE_COUNT)
 typedef struct StagingBuffer {
-    uint32 capacity;
-    uint32 size;
-    byte* componentData;
-    StagedEntity* entityData;
+    uint8 threadID;
+    AvAllocator componentAllocator;
+    StagedEntity* entities;
+    AvAllocator componentHandleAllocator;
+    Command* commands;
+    
+    ComponentMask mappingBlockMask[MAPPING_RANGE_COUNT];
+    uint32 mappingBlocks[MAPPING_BLOCK_COUNT];
 } StagingBuffer;
 
 
-StagedEntity* getStagedEntity(Scene scene, StagingBuffer buffer, Entity entity){
-    if(scene==NULL || entity==INVALID_ENTITY) return NULL;
-    uint32 index = ENTITY_INDEX(entity);
-    avRWLockReadLock(scene->entityIdLock);
-    Entity localEntity = scene->entityTable[index];
-    uint32 generation = scene->entityGeneration[index] & ~ENTITY_STAGED_BIT;
-    avRWLockReadUnlock(scene->entityIdLock);
-    if(generation != ENTITY_GENERATION(entity)) return NULL;
-    return buffer.entityData + localEntity;
+#define MAPPING_BLOCK_SIZE ((CHUNK_CAPACITY * MAX_CHUNKS)/MAPPING_BLOCK_COUNT)
+typedef struct EntityMappingBlock{
+    Entity entityIndex[MAPPING_BLOCK_SIZE];
+} EntityMappingBlock;
+
+#define MAX_THREAD_COUNT 32
+typedef struct EntityMappingPool{
+    uint32 blockCount;
+    union{
+        EntityMappingBlock blocks;
+        uint32 nextFree;
+    }* blocks;
+    AvRwLock lock;
+} EntityMappingPool;
+
+static EntityMappingPool pool = {0};
+
+void initMappingPool(){
+    avRWLockCreate(&pool.lock);
+}
+
+static uint32 mappingPoolAllocate(){
+
+}
+
+static void mappingPoolFree(uint32 block){
+
+}
+
+void deinitMappingPool(){
+    avRWLockDestroy(pool.lock);
 }
 
 static uint32 getComponentIndex(StagedEntity* entity, ComponentType type){
@@ -83,34 +110,122 @@ static uint32 getComponentIndex(StagedEntity* entity, ComponentType type){
     return MAX_COMPONENT_COUNT;
 }
 
-StagedComponent* getStagedComponent(Scene scene, StagedEntity* entity, ComponentType type, uint32 index){
-    if(scene == NULL || entity == NULL || type >= MAX_COMPONENT_COUNT) return NULL;
-    uint32 index = getComponentIndex(entity, type);
-    if(index >= MAX_COMPONENT_COUNT) return NULL;
-    if(index >= 0 && !MASK_HAS_COMPONENT(entity->arrayMask, type)) return NULL;
+uint32 cmdCreateEntity(StagingBuffer* buffer, Entity entity){
+    Command command = {
+        .type = CMD_CREATE_ENTTIY,
+        .entity = entity,
+    };
+    uint32 index = darrayLength(buffer->commands);
+    darrayPush(buffer->commands, command);
+    return index;
 }
 
+void cmdDestroyEntity(StagingBuffer* buffer, Entity entity){
+    Command command = {
+        .type = CMD_DESTROY_ENTITY,
+        .entity = entity,
+    };
+    darrayPush(buffer->commands, command);
+}
 
-void stagedEntityAddComponent(StagedEntity* entity, ComponentInfo* info){
-    if(entity == NULL) return;
-    uint32 componentCounts[MAX_COMPONENT_COUNT] = {0};
-    ComponentInfo* tmpInfo = info;
-    while(tmpInfo){
-        if(tmpInfo->type >= MAX_COMPONENT_COUNT) continue;
-        componentCounts[tmpInfo->type]++;
-        tmpInfo = tmpInfo->next;
-    }
+Entity stagedEntityCreate(Scene scene, StagingBuffer* buffer, ComponentInfoRef info){
 
-    uint32 componentSize = 0;
-    uint32 dataSize = 0;
-    for(uint32 i = 0; i < MAX_COMPONENT_COUNT; i++){
-        if(componentCounts[i]==0) continue;
-        dataSize += getComponentSize(i) * componentCounts[i];
-        componentSize += componentCounts[i]==1 ? sizeof(StagedComponent) : sizeof(StagedComponentArray);
+    // create staged entity
+    StagedEntity tmp = {0};
+    uint32 entityIndex = darrayLength(buffer->entities);
+    darrayPush(buffer->entities, tmp);
+    StagedEntity* sEntity = &buffer->entities[entityIndex];
+    LocalEntity localEntity = (buffer->threadID << 24) | (entityIndex & 0xffffff);    
 
+    Entity entity = allocateEntityID(scene, localEntity, true);
+    avRWLockReadLock(scene->entityIdLock);
+    scene->entityGeneration[ENTITY_INDEX(entity)] |= ENTITY_STAGED_BIT;
+    avRWLockReadUnlock(scene->entityIdLock);
+   
+    // emit command
+    sEntity->createCommandIndex = cmdCreateEntity(buffer, entity);
+}
+bool32 stagedEntityAddComponent(Scene scene, Entity entity, ComponentInfoRef info);
+bool32 stagedEntityRemoveComponent(Scene scene, Entity entity, ComponentType type, uint32 index);
+bool32 stagedEntityRemoveComponentType(Scene scene, Entity entity, ComponentType type);
+
+
+static void performStagedComponentDestructors(Scene scene, StagingBuffer* buffer, Entity entity, StagedEntity* sEntity){
+    ITERATE_MASK(sEntity->mask, component){
+        uint32 componentIndex = getComponentIndex(sEntity, component);
+        uint32 size = getComponentSize(component);
+        ComponentDestructor destructor = getComponentDestructor(component);
+        if(destructor==NULL) continue;
+        if(MASK_HAS_COMPONENT(sEntity->arrayMask, component)){
+            StagedComponentArray* array = sEntity->components[componentIndex]->array;
+            for(uint32 i = 0; i < array->count; i++){
+                StagedComponent* component = array->data[i];
+                if(component->isClone) continue;
+                destructor(scene, entity, component->data, size);
+                // remove modify command
+                buffer->commands[component->lastModifiedCommandIndex].type = CMD_NOP;
+            }
+        }else{
+            StagedComponent* component = sEntity->components[componentIndex]->single;
+            if(component->isClone) continue;
+            destructor(scene, entity, component->data, size);
+            buffer->commands[component->lastModifiedCommandIndex].type = CMD_NOP;
+        }
     }
 }
 
-void* stagingBufferGet(StagingBuffer* buffer, uint32 size){
+bool32 stagedEntityDestroy(Scene scene, StagingBuffer* buffer, Entity entity){
+    if(entity==INVALID_ENTITY || scene==NULL || buffer==NULL) return false;
     
+    bool8 isStaged;
+    LocalEntity localEntity;
+    uint32 entityIndex;
+    if(!getEntityDetails(scene, entity, &entityIndex, &localEntity, NULL, &isStaged)) return false;
+    if(isStaged){
+        // remove staged command
+        if(localEntity >> 24 != buffer->threadID) return false;
+        StagedEntity* sEntity = &buffer->entities[localEntity & 0xffffff];
+
+        performStagedComponentDestructors(scene, buffer, entity, sEntity);
+
+        buffer->commands[sEntity->createCommandIndex].type = CMD_NOP; 
+        // it is no longer necissarry to commit this entity 
+        // as it was fully staged and not yet commited
+        return true;
+    }
+
+    uint32 block = entityIndex / MAPPING_BLOCK_COUNT;
+    uint32 entityBlockIndex = entityIndex % MAPPING_BLOCK_COUNT;
+    uint32 maskIndex = block / (MAX_COMPONENT_COUNT);
+    uint32 blockBit = block % MAX_COMPONENT_COUNT;
+    if(MASK_HAS_COMPONENT(buffer->mappingBlockMask[maskIndex], blockBit)){
+        //the block is allocated to this thread
+        uint32 blockIndex = entityIndex - block*MAPPING_BLOCK_SIZE;
+        uint32 poolIndex = buffer->mappingBlocks[block];
+        avRWLockReadLock(pool.lock);
+        if(poolIndex >= pool.blockCount) {
+            avRWLockReadUnlock(pool.lock);
+            goto skipDestructors;
+        }
+        EntityMappingBlock* mappingBlock = &pool.blocks[poolIndex].blocks;
+        avRWLockReadUnlock(pool.lock);
+        LocalEntity locEntity;
+        if((locEntity = mappingBlock->entityIndex[entityBlockIndex]) == INVALID_ENTITY) goto skipDestructors;
+        
+        uint32 localEntityIndex = locEntity & 0xffffff;
+        uint32 threadId = locEntity >> 24;
+        if(threadId != buffer->threadID) goto skipDestructors;
+
+        StagedEntity* sEntity = &buffer->entities[localEntityIndex]; 
+        // a partially staged entity only holds staged components
+        performStagedComponentDestructors(scene, buffer, entity, sEntity);
+    }
+skipDestructors:
+    cmdDestroyEntity(buffer, entity);
+    return true;
 }
+uint32 stagedEntityGetComponentCount(Scene scene, Entity entity, ComponentType type);
+void* stagedEntityGetComponentRead(Scene scene, Entity entity, ComponentType type, uint32 index);
+void* stagedEntityGetComponentReadFast(Scene scene, Entity entity, ComponentType type, uint32 index);
+void* stagedEntityGetComponentWrite(Scene scene, Entity entity, ComponentType type, uint32 index);
+void* stagedEntityGetComponentWriteFast(Scene scene, Entity entity, ComponentType type, uint32 index);

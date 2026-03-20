@@ -1,3 +1,4 @@
+#pragma once
 #include "ecs.h"
 
 #include <AvUtils/avMemory.h>
@@ -18,8 +19,6 @@ typedef struct ComponentRegistry {
 	ComponentEntry entries[COMPONENT_REGISTRY_SIZE];
 } ComponentRegistry;
 
-static ComponentRegistry componentRegistry = {0};
-
 typedef struct ComponentArray {
     uint32 count;
     uint32 capacity;
@@ -36,16 +35,20 @@ typedef union {
 typedef Entity LocalEntity;
 
 #define INVALID_ENTITY_TYPE ((EntityTypeID)-1)
-#define ENTITY_ID_RESERVED ((Entity)-2)
+//#define ENTITY_ID_RESERVED ((Entity)-2)
 
 
 #define ENTITY_LOCAL_INDEX(entity) ((entity) & 0xff)
 #define ENTITY_CHUNK(entity) (((entity) & ((MAX_CHUNKS-1)<<8))>>8)
 #define ENTITY(chunk, index) (((chunk & 0xffff)<<8) | ((index) & 0xff))
-#define ENTITY_GENERATION(entity) (((entity) >> 24) & 0xff)
+
+#define ENTITY_GENERATION(entity) (((entity) >> 24) & 0x3f)
+#define ENTITY_STAGED(entity) (((entity) >> 31) & 0x1)
+//#define ENTITY_COMPONENT_STAGED(entity) (((entity) >> 30) & 0x1)
+
 #define ENTITY_INDEX(entity) ((entity) & 0xffffff)
 
-#define GLOBAL_ENTITY(generation, entity) ((((generation)&0xff)<<24)|((entity)&0xffffff))
+#define GLOBAL_ENTITY(generation, entity) ((((generation)&0x7f)<<24)|((entity)&0xffffff))
 
 #define CHUNK_CAPACITY 5 //256
 typedef struct EntityChunk {
@@ -96,3 +99,9 @@ struct Scene {
 uint32 getComponentSize(ComponentType component);
 ComponentConstructor getComponentConstructor(ComponentType component);
 ComponentDestructor getComponentDestructor(ComponentType component);
+
+Entity allocateEntityID(Scene scene, LocalEntity value, bool8 staged);
+void freeEntityID(Scene scene, Entity entity);
+
+bool32 getEntityDetails(Scene scene, Entity entity, uint32* index, LocalEntity* localEntity, uint32* generation, bool8* staged);
+LocalEntity getEntityLocal(Scene scene, Entity entity);

@@ -1,11 +1,14 @@
 #include "ecsInternal.h"
 #include "ecsStaging.h"
 
+static ComponentRegistry componentRegistry = {0};
+
 
 // the slot reserved is set to ENTITY_ID_RESERVED
 // and should be imediately set to the correct value, 
 // as the id is not checked for the reserved case (will segfault)
-static Entity allocateEntityID(Scene scene){
+Entity allocateEntityID(Scene scene, LocalEntity value, bool8 staged){
+    if(value==INVALID_ENTITY || scene==NULL) return INVALID_ENTITY;
     // allocate more space if needed
     avRWLockReadLock(scene->entityIdLock);
     if(scene->entityCount >= scene->entityCapacity){
@@ -18,7 +21,7 @@ static Entity allocateEntityID(Scene scene){
             scene->entityGeneration = avReallocate(scene->entityGeneration, sizeof(uint8)*scene->entityCapacity, "");
             for(uint32 i = oldCapacity; i < scene->entityCapacity; i++){
                 scene->entityTable[i] = INVALID_ENTITY;
-                scene->entityGeneration[i] = (uint8)~(ENTITY_STAGED_BIT>>24);
+                scene->entityGeneration[i] = (uint8)~(ENTITY_STAGED_BIT);
             }
         }
         avRWLockWriteUnlock(scene->entityIdLock);
@@ -28,36 +31,38 @@ static Entity allocateEntityID(Scene scene){
     Entity entity = INVALID_ENTITY;
     avRWLockReadLock(scene->entityIdLock);
     uint32 i = 0;
-    uint32 entityCount = scene->entityCount;
+    uint32 entityCount = atomic_load_explicit(&scene->entityCount, memory_order_acquire);
     for(uint32 checkCount = 0; checkCount < scene->entityCapacity; checkCount++){
         // start at the end of the components, as there is bound to be space ther, 
         // and only wrap back around if there isn't
-        i = (checkCount + entityCount) % scene->entityCapacity; 
-        if(scene->entityTable[i]==INVALID_ENTITY){
-            Entity id = atomic_exchange(scene->entityTable + i, ENTITY_ID_RESERVED);
-            if(id==INVALID_ENTITY){
-                // we have clamed the slot
-                entity = i;
-                atomic_fetch_add(&scene->entityCount, 1);
-                break;
-            }else{
-                // restore the slot, this should be fine as contention only happens when the id is reserved, and not yet used
-                Entity newId = id;
-                do{
-                    id = newId;
-                    newId = atomic_exchange(scene->entityTable + i, id);
-                } while(newId != id);
-            }
+        i = (checkCount + entityCount) % scene->entityCapacity;
+        
+        Entity expected = INVALID_ENTITY;
+        if(atomic_compare_exchange_strong_explicit(scene->entityTable + i, &expected, value, memory_order_acq_rel, memory_order_acquire)){
+            uint32 generation = (scene->entityGeneration[i]+1)&(~ENTITY_STAGED_BIT);
+            scene->entityGeneration[i] = generation | (staged!=0 ? ENTITY_STAGED_BIT : 0);
+            entity = GLOBAL_ENTITY(generation, i);
+            atomic_fetch_add_explicit(&scene->entityCount, 1, memory_order_acq_rel);
+            break;
         }
     }
     avRWLockReadUnlock(scene->entityIdLock);
     return entity;
 }
 
-static void freeEntityID(Scene scene, Entity entity){
+void freeEntityID(Scene scene, Entity entity){
+    if(scene==NULL || entity==INVALID_ENTITY) return;
+    uint32 index = ENTITY_INDEX(entity);
     avRWLockReadLock(scene->entityIdLock);
-    atomic_exchange(scene->entityTable + entity, INVALID_ENTITY);
-    atomic_fetch_sub(&scene->entityCount, 1);
+    if(index >= scene->entityCapacity) {
+        avRWLockReadUnlock(scene->entityIdLock);
+        return;
+    }
+    scene->entityGeneration[index] &= ~(ENTITY_STAGED_BIT);
+    Entity oldEntity = atomic_exchange_explicit(scene->entityTable + index, INVALID_ENTITY, memory_order_release);
+    if(oldEntity!=INVALID_ENTITY){ // slot was not alread freed
+        atomic_fetch_sub_explicit(&scene->entityCount, 1, memory_order_acq_rel);
+    }
     avRWLockReadUnlock(scene->entityIdLock);
 }
 
@@ -195,36 +200,58 @@ static EntityChunk* getChunk(uint32 chunkID){
 }
 
 static EntityChunk* getLocalEntityChunk(Entity localEntity){
-    if(localEntity==INVALID_ENTITY || localEntity==ENTITY_ID_RESERVED || localEntity & ENTITY_STAGED_BIT) return NULL;
+    if(localEntity==INVALID_ENTITY || localEntity & ENTITY_STAGED_BIT) return NULL;
     return &chunkPool.chunks[ENTITY_CHUNK(localEntity)];
 }
 
-static EntityChunk* getEntityChunk(Scene scene, Entity entity){
-    if(scene==NULL || entity==INVALID_ENTITY) return NULL;
-    uint32 index = ENTITY_INDEX(entity);
+
+bool32 getEntityDetails(Scene scene, Entity entity, uint32* index, LocalEntity* localEntity, uint32* generation, bool8* staged){
+    uint32 tmpIndex;
+    LocalEntity tmpLocalEntity;
+    uint32 tmpGeneration;
+    bool8 tmpStaged;
+    bool8 tmpStagedComp;
+    if(scene==NULL || entity==INVALID_ENTITY) return false;
+    if(!index) index = &tmpIndex;
+    if(!localEntity) localEntity = &tmpLocalEntity;
+    if(!generation) generation = &tmpGeneration;
+    if(!staged) staged = &tmpStaged;
+
+    *index = ENTITY_INDEX(entity);
+    if(*index >= scene->entityCount) return false;
     avRWLockReadLock(scene->entityIdLock);
-    Entity localEntity = scene->entityTable[index];
-    uint32 generation = scene->entityGeneration[index] & ~ENTITY_STAGED_BIT;
+    *localEntity = scene->entityTable[*index];
+    uint32 tmpGen = scene->entityGeneration[*index];
     avRWLockReadUnlock(scene->entityIdLock);
-    if(generation !=  (ENTITY_GENERATION(entity) & ~ENTITY_STAGED_BIT)) return NULL;
+    *generation = tmpGen & ~(ENTITY_STAGED_BIT);
+    if(*generation != ENTITY_GENERATION(entity)) return false;
+    *staged = (tmpGen & ENTITY_STAGED_BIT) != 0;
+    return true;
+}
+
+static EntityChunk* getEntityChunk(Scene scene, Entity entity){
+    LocalEntity localEntity;
+    if(!getEntityDetails(scene, entity, NULL, &localEntity, NULL, NULL)) return NULL;
     return getLocalEntityChunk(localEntity);
 }
 
 static uint32 getLocalEntityLocalIndex(Entity localEntity){
-    if(localEntity==INVALID_ENTITY || localEntity==ENTITY_ID_RESERVED || localEntity & ENTITY_STAGED_BIT) return 0;
+    if(localEntity==INVALID_ENTITY || localEntity & ENTITY_STAGED_BIT) return 0;
     return ENTITY_LOCAL_INDEX(localEntity);
 }
 
 static uint32 getEntityLocalIndex(Scene scene, Entity entity){
-    if(scene==NULL || entity==INVALID_ENTITY) return NULL;
-    uint32 index = ENTITY_INDEX(entity);
-    avRWLockReadLock(scene->entityIdLock);
-    Entity localEntity = scene->entityTable[index];
-    uint32 generation = scene->entityGeneration[index] & ~ENTITY_STAGED_BIT;
-    avRWLockReadUnlock(scene->entityIdLock);
-    if(generation != (ENTITY_GENERATION(entity) & ~ENTITY_STAGED_BIT)) return NULL;
+    LocalEntity localEntity;
+    if(!getEntityDetails(scene, entity, NULL, &localEntity, NULL, NULL)) return -1;
     return getLocalEntityLocalIndex(localEntity);
 }
+
+LocalEntity getEntityLocal(Scene scene, Entity entity){
+    LocalEntity localEntity;
+    if(!getEntityDetails(scene, entity, NULL, &localEntity, NULL, NULL)) return INVALID_ENTITY;
+    return localEntity;
+}
+
 
 static Entity getEntity(uint32 chunkID, uint32 localIndex){
     return getChunk(chunkID)->entities[localIndex];
@@ -794,10 +821,10 @@ static bool32 moveEntity(Scene scene, Entity src, LocalEntity dst){
     dstChunk->entities[dstIndex] = src;
     srcChunk->entities[srcIndex] = INVALID_ENTITY;
 
-    avRWLockWriteLock(scene->entityIdLock); // should still be fast as this should only run on main thread
+    avRWLockReadLock(scene->entityIdLock); // should still be fast as this should only run on main thread
     scene->entityTable[ENTITY_INDEX(src)] = dst;
     // scene->entityTable[ENTITY_INDEX(dst)] = ENTITY(getChunkID(srcChunk), srcLocalIndex);
-    avRWLockWriteUnlock(scene->entityIdLock);
+    avRWLockReadUnlock(scene->entityIdLock);
 
     srcChunk->count--;
 
@@ -981,15 +1008,8 @@ static Entity createEntity(EntityType* type){
     Entity localEntity = createLocalEntity(type, &chunk, &localIndex);
     if(localEntity==INVALID_ENTITY) return INVALID_ENTITY;
 
-    Entity globalEntity = allocateEntityID(type->scene);
-    avRWLockReadLock(type->scene->entityIdLock);
-    // we can alter the generation and table without write lock as we have soul ownership
-    type->scene->entityGeneration[globalEntity] = (type->scene->entityGeneration[globalEntity]+1) & (~ENTITY_STAGED_BIT);
-    uint8 generation = type->scene->entityGeneration[globalEntity];
-    type->scene->entityTable[globalEntity] = localEntity;
-    avRWLockReadUnlock(type->scene->entityIdLock);
-
-    Entity entity = GLOBAL_ENTITY(generation, globalEntity);
+    Entity entity = allocateEntityID(type->scene, localEntity, false);
+    
     chunk->entities[localIndex] = entity;
     return chunk->entities[localIndex];
 }
