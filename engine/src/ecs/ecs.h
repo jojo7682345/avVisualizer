@@ -47,8 +47,10 @@ AV_API uint32 componentMaskCount(ComponentMask mask);
 
 typedef struct Scene* Scene;
 typedef void* ComponentData;
+typedef uint32 ComponentHandle;
 typedef struct ComponentInfo {
     ComponentType type;
+    ComponentHandle* handleOut;
     struct ComponentInfo* next;
 } ComponentInfo;
 typedef void (*ComponentConstructor)(Scene scene, Entity entity, ComponentData data, uint32 size, ComponentInfo* info);
