@@ -1,0 +1,11 @@
+#pragma once
+#include "defines.h"
+
+
+typedef uint32 Entity;
+typedef Entity LocalEntity;
+
+typedef uint32 ComponentHandle;
+typedef void* ComponentData;
+
+#define INVALID_ENTITY ((Entity)-1)

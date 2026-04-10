@@ -1,0 +1,10 @@
+#pragma once
+#include "ecsTypes.h"
+
+typedef uint16 ComponentType;
+
+typedef struct ComponentCreateInfo {
+    ComponentType type;
+    ComponentHandle* handleOut;
+    struct ComponentInfo* next;
+} ComponentCreateInfo;

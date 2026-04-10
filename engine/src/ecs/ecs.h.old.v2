@@ -47,8 +47,10 @@ AV_API uint32 componentMaskCount(ComponentMask mask);
 
 typedef struct Scene* Scene;
 typedef void* ComponentData;
+typedef uint32 ComponentHandle;
 typedef struct ComponentInfo {
     ComponentType type;
+    ComponentHandle* handleOut;
     struct ComponentInfo* next;
 } ComponentInfo;
 typedef void (*ComponentConstructor)(Scene scene, Entity entity, ComponentData data, uint32 size, ComponentInfo* info);
@@ -63,31 +65,22 @@ typedef void* ComponentInfoRef;
 
 AV_API Entity entityCreate(Scene scene, ComponentInfoRef info);
 AV_API bool32 entityAddComponent(Scene scene, Entity entity, ComponentInfoRef info);
-AV_API bool32 entityRemoveComponent(Scene scene, Entity entity, ComponentType type);
+AV_API bool32 entityRemoveComponent(Scene scene, Entity entity, ComponentType type, uint32 index);
+AV_API bool32 entityRemoveComponentType(Scene scene, Entity entity, ComponentType type);
 AV_API bool32 entityDestroy(Scene scene, Entity entity);
 
-AV_API bool32 entityHasComponent(Scene scene, Entity entity, ComponentType type);
+AV_API uint32 entityGetComponentCount(Scene scene, Entity entity, ComponentType type);
 
 // NOTE: pointer does not remain valid after any changes to this or other entities
-AV_API void* entityGetComponentRead(Scene scene, Entity entity, ComponentType type);
-// NOTE: pointer does not remain valid after any changes to this or other entities
-// All checks are removed for speed
-AV_API void* entityGetComponentReadFast(Scene scene, Entity entity, ComponentType type);
-
-// NOTE: pointer does not remain valid after any changes to this or other entities
-AV_API void* entityGetComponentWrite(Scene scene, Entity entity, ComponentType type);
+AV_API void* entityGetComponentRead(Scene scene, Entity entity, ComponentType type, uint32 index);
 // NOTE: pointer does not remain valid after any changes to this or other entities
 // All checks are removed for speed
-AV_API void* entityGetComponentWriteFast(Scene scene, Entity entity, ComponentType type);
+AV_API void* entityGetComponentReadFast(Scene scene, Entity entity, ComponentType type, uint32 index);
 
+// NOTE: pointer does not remain valid after any changes to this or other entities
+AV_API void* entityGetComponentWrite(Scene scene, Entity entity, ComponentType type, uint32 index);
+// NOTE: pointer does not remain valid after any changes to this or other entities
+// All checks are removed for speed
+AV_API void* entityGetComponentWriteFast(Scene scene, Entity entity, ComponentType type, uint32 index);
 
-typedef struct StagingBuffer* StagingBufferHandle;
-StagingBufferHandle stagingBufferCreate(Scene scene);
-bool32 stagedEntityDestroy(Scene scene, StagingBufferHandle buffer, Entity entity);
-bool32 stagedEntityRemoveComponent(Scene scene, StagingBufferHandle buffer, Entity entity, ComponentType type);
-bool32 stagedEntityAddComponent(Scene scene, StagingBufferHandle buffer, Entity entity, ComponentInfo* info);
-Entity stagedEntityCreate(Scene scene, StagingBufferHandle buffer, ComponentInfoRef info);
-
-
-bool32 stagingBufferCommit(Scene scene, StagingBufferHandle buffer);
 

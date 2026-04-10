@@ -19,7 +19,18 @@ typedef struct ComponentRegistry {
 	ComponentEntry entries[COMPONENT_REGISTRY_SIZE];
 } ComponentRegistry;
 
-typedef ComponentData Component;
+typedef struct ComponentArray {
+    uint32 count;
+    uint32 capacity;
+    uint32* index;
+    //uint32* reference;
+    ComponentData data;
+} ComponentArray;
+
+typedef union {
+    ComponentData single;
+    ComponentArray* array;
+} Component;
 
 typedef Entity LocalEntity;
 
@@ -60,6 +71,7 @@ typedef struct ChunkPool {
 
 typedef struct EntityType {
     ComponentMask mask; // order of components is specified in order of mask
+    ComponentMask arrayMask;
     uint16 componentIndex[MAX_COMPONENT_COUNT];
     uint32 chunkCount;
     uint32 chunkCapacity;
@@ -91,5 +103,5 @@ ComponentDestructor getComponentDestructor(ComponentType component);
 Entity allocateEntityID(Scene scene, LocalEntity value, bool8 staged);
 void freeEntityID(Scene scene, Entity entity);
 
-bool32 getEntityDetails(Scene scene, Entity entity, uint32* index, LocalEntity* localEntity, uint8* generation, bool8* staged);
+bool32 getEntityDetails(Scene scene, Entity entity, uint32* index, LocalEntity* localEntity, uint32* generation, bool8* staged);
 LocalEntity getEntityLocal(Scene scene, Entity entity);

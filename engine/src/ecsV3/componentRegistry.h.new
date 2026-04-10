@@ -1,0 +1,29 @@
+#pragma once
+#include "ecsTypes.h"
+
+#include "component.h"
+#include "componentMask.h"
+#include "scene.h"
+
+#define COMPONENT_REGISTRY_SIZE MAX_COMPONENT_COUNT
+
+typedef void (*ComponentConstructor)(Scene scene, Entity entity, ComponentData data, uint32 size, ComponentCreateInfo* info);
+typedef void (*ComponentDestructor)(Scene scene, Entity entity, ComponentData data, uint32 size);
+
+typedef struct ComponentEntry {
+	uint32 size;
+    ComponentConstructor constructor;
+    ComponentDestructor destructor;
+} ComponentEntry;
+
+typedef struct ComponentRegistry {
+	ComponentMask registeredComponents;
+	ComponentEntry entries[COMPONENT_REGISTRY_SIZE];
+} ComponentRegistry;
+
+AV_API bool32 registerComponent(ComponentType* component, uint32 size, ComponentConstructor constructor, ComponentDestructor destructor);
+
+AV_API bool32 isComponentRegistered(ComponentType component);
+AV_API uint32 getComponentSize(ComponentType component);
+AV_API ComponentConstructor getComponentConstructor(ComponentType component);
+AV_API ComponentDestructor getComponentDestructor(ComponentType component);
