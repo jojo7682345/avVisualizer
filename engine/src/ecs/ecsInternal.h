@@ -3,6 +3,8 @@
 
 #include <AvUtils/avMemory.h>
 #include <AvUtils/threading/avRwLock.h>
+#include <AvUtils/threading/avThread.h>
+#include <AvUtils/memory/avAllocator.h>
 #include "logging.h"
 
 #include <stdatomic.h>
@@ -68,6 +70,33 @@ typedef struct EntityType {
     Scene scene;
 }EntityType;
 
+typedef struct StagedComponent{
+    ComponentType type;
+    Entity entity;
+    uint32 lastModifiedCommandIndex;
+    bool8 isClone;
+    bool8 isDestroyed;
+    //uint32 index;
+    byte* data;
+} StagedComponent;
+
+typedef struct StagedEntity {
+    ComponentMask mask;
+    uint32 createCommandIndex;
+    Entity ID;
+    struct StagedComponentList{
+        StagedComponent data;
+        struct StagedComponentList* next;
+    }* components;
+}StagedEntity;
+
+typedef struct StagingBuffer {
+    uint8 threadID;
+    AvAllocator componentAllocator;
+    StagedEntity* entities;
+    AvAllocator componentHandleAllocator;
+} StagingBuffer;
+
 struct Scene {
     uint32 entityTypeCapacity;
     uint32 entityTypeCount;
@@ -82,7 +111,10 @@ struct Scene {
     _Atomic Entity* entityTable; // SceneEntity -> ChunkEntity
     uint8* entityGeneration;
     //Entity* entityReference;
+
+    StagingBuffer* stagingBuffers; // IDMAPPING
 };
+
 
 uint32 getComponentSize(ComponentType component);
 ComponentConstructor getComponentConstructor(ComponentType component);
@@ -93,3 +125,21 @@ void freeEntityID(Scene scene, Entity entity);
 
 bool32 getEntityDetails(Scene scene, Entity entity, uint32* index, LocalEntity* localEntity, uint8* generation, bool8* staged);
 LocalEntity getEntityLocal(Scene scene, Entity entity);
+
+bool32 createEmptyEntity(Scene scene, Entity entity, ComponentMask mask);
+EntityChunk* getLocalEntityChunk(LocalEntity localEntity);
+uint32 getLocalEntityLocalIndex(LocalEntity localEntity);
+EntityType* getEntityType(Scene scene, EntityTypeID type);
+uint32 getComponentIndex(EntityType* type, ComponentType component);
+
+typedef struct StagingBuffer* StagingBufferHandle;
+
+void stagingBufferCreate(Scene scene, AvThreadID threadId);
+void stagingBufferDestroy(Scene scene, AvThreadID threadId);
+bool32 stagedEntityDestroy(Scene scene, StagingBufferHandle buffer, Entity entity);
+bool32 stagedEntityRemoveComponent(Scene scene, StagingBufferHandle buffer, Entity entity, ComponentType type);
+bool32 stagedEntityAddComponent(Scene scene, StagingBufferHandle buffer, Entity entity, ComponentInfo* info);
+Entity stagedEntityCreate(Scene scene, StagingBufferHandle buffer, ComponentInfoRef info);
+bool32 stagedEntityHasComponent(Scene scene, StagingBufferHandle buffer, Entity entity, ComponentType type);
+
+bool32 stagingBufferCommit(Scene scene, StagingBufferHandle buffer);

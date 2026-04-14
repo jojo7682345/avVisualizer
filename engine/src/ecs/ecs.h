@@ -81,13 +81,5 @@ AV_API void* entityGetComponentWrite(Scene scene, Entity entity, ComponentType t
 AV_API void* entityGetComponentWriteFast(Scene scene, Entity entity, ComponentType type);
 
 
-typedef struct StagingBuffer* StagingBufferHandle;
-StagingBufferHandle stagingBufferCreate(Scene scene);
-bool32 stagedEntityDestroy(Scene scene, StagingBufferHandle buffer, Entity entity);
-bool32 stagedEntityRemoveComponent(Scene scene, StagingBufferHandle buffer, Entity entity, ComponentType type);
-bool32 stagedEntityAddComponent(Scene scene, StagingBufferHandle buffer, Entity entity, ComponentInfo* info);
-Entity stagedEntityCreate(Scene scene, StagingBufferHandle buffer, ComponentInfoRef info);
-
-
-bool32 stagingBufferCommit(Scene scene, StagingBufferHandle buffer);
+AV_API void sceneApply(Scene scene);
 

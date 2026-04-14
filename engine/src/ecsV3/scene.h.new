@@ -1,8 +1,0 @@
-#pragma once
-
-#include "defines.h"
-
-typedef struct Scene* Scene;
-
-AV_API Scene sceneCreate();
-AV_API void sceneDestroy(Scene scene);

@@ -64,27 +64,27 @@ bool8 initialize(struct Application* app){
         .next = NULL,
     };
 
-    StagingBuferHandle buffer = stagingBufferCreate(scene);
+    Entity foo = entityCreate(scene, &fooInfo);
+    Entity bar = entityCreate(scene, &fooInfo);
+    Entity baz = entityCreate(scene, &fooInfo);
 
-    Entity foo = stagedEntityCreate(scene, buffer, &fooInfo);
-    Entity bar = stagedEntityCreate(scene, buffer, &fooInfo);
-    Entity baz = stagedEntityCreate(scene, buffer, &fooInfo);
+    Entity a = entityCreate(scene, &barInfo);
 
-    Entity a = stagedEntityCreate(scene, buffer, &barInfo);
+    entityDestroy(scene, foo);
 
-    stagedEntityDestroy(scene, buffer, foo);
+    foo = entityCreate(scene, &fooInfo);
 
-    foo = stagedEntityCreate(scene, buffer, &fooInfo);
-
-    stagedEntityAddComponent(scene, buffer, a, &singleFoo);
-    stagedEntityAddComponent(scene, buffer, a, &singleFoo);
-    stagedEntityAddComponent(scene, buffer, a, &singleFoo);
-    stagedEntityAddComponent(scene, buffer, a, &singleFoo);
+    entityAddComponent(scene, a, &singleFoo);
+    entityAddComponent(scene, a, &singleFoo);
+    entityAddComponent(scene, a, &singleFoo);
+    entityAddComponent(scene, a, &singleFoo);
     
-    stagedEntityRemoveComponent(scene, buffer, a, COMPONENT_TYPE_FOO);
+    entityRemoveComponent(scene, a, COMPONENT_TYPE_FOO);
     //entityRemoveComponentType(scene, a, COMPONENT_TYPE_FOO);
 
     avLog(AV_DEBUG, "Entity %x has %u foo components", a, entityHasComponent(scene, a, COMPONENT_TYPE_FOO));
+
+    sceneApply(scene);
     return true;
 }
 

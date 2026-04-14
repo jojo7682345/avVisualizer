@@ -1,6 +1,9 @@
 #include "ecsInternal.h"
 #include "ecsStaging.h"
 
+#include "containers/darray.h"
+#include "containers/idMapping.h"
+
 static ComponentRegistry componentRegistry = {0};
 
 
@@ -63,6 +66,20 @@ void freeEntityID(Scene scene, Entity entity){
     if(oldEntity!=INVALID_ENTITY){ // slot was not alread freed
         atomic_fetch_sub_explicit(&scene->entityCount, 1, memory_order_acq_rel);
     }
+    avRWLockReadUnlock(scene->entityIdLock);
+}
+
+void modifyEntityID(Scene scene, Entity entity, LocalEntity localEntity, bool32 isStaged){
+    if(scene==NULL || entity==INVALID_ENTITY) return;
+    uint32 index = ENTITY_INDEX(entity);
+    avRWLockReadLock(scene->entityIdLock);
+    if(index >= scene->entityCapacity){
+        avRWLockReadUnlock(scene->entityIdLock);
+        return;
+    }
+    scene->entityTable[index] = localEntity;
+    scene->entityGeneration[index] = (~(ENTITY_STAGED_BIT)>>24) & scene->entityGeneration[index] | (isStaged << 7);
+
     avRWLockReadUnlock(scene->entityIdLock);
 }
 
@@ -199,7 +216,7 @@ static EntityChunk* getChunk(uint32 chunkID){
     return chunkPool.chunks + index;
 }
 
-static EntityChunk* getLocalEntityChunk(Entity localEntity){
+EntityChunk* getLocalEntityChunk(Entity localEntity){
     if(localEntity==INVALID_ENTITY) return NULL;
     return &chunkPool.chunks[ENTITY_CHUNK(localEntity)];
 }
@@ -241,24 +258,30 @@ bool32 getEntityDetails(Scene scene, Entity entity, uint32* index, LocalEntity* 
 
 static EntityChunk* getEntityChunk(Scene scene, Entity entity){
     LocalEntity localEntity;
-    if(!getEntityDetails(scene, entity, NULL, &localEntity, NULL, NULL)) return NULL;
+    bool8 isStaged = false;
+    if(!getEntityDetails(scene, entity, NULL, &localEntity, NULL, &isStaged)) return NULL;
+    if(isStaged) return NULL;
     return getLocalEntityChunk(localEntity);
 }
 
-static uint32 getLocalEntityLocalIndex(Entity localEntity){
+uint32 getLocalEntityLocalIndex(Entity localEntity){
     if(localEntity==INVALID_ENTITY) return 0;
     return ENTITY_LOCAL_INDEX(localEntity);
 }
 
 static uint32 getEntityLocalIndex(Scene scene, Entity entity){
     LocalEntity localEntity;
-    if(!getEntityDetails(scene, entity, NULL, &localEntity, NULL, NULL)) return -1;
+    bool8 isStaged = false;
+    if(!getEntityDetails(scene, entity, NULL, &localEntity, NULL, &isStaged)) return -1;
+    if(isStaged) return -1;
     return getLocalEntityLocalIndex(localEntity);
 }
 
 LocalEntity getEntityLocal(Scene scene, Entity entity){
     LocalEntity localEntity;
-    if(!getEntityDetails(scene, entity, NULL, &localEntity, NULL, NULL)) return INVALID_ENTITY;
+    bool8 isStaged;
+    if(!getEntityDetails(scene, entity, NULL, &localEntity, NULL, &isStaged)) return INVALID_ENTITY;
+    if(isStaged) return INVALID_ENTITY;
     return localEntity;
 }
 
@@ -473,6 +496,7 @@ AV_API Scene sceneCreate(){
     scene->entityTable[0] = INVALID_ENTITY;
     scene->entityGeneration = avAllocate(sizeof(uint8)*scene->entityCapacity, "");
     scene->entityGeneration[0] = (uint8) ~(ENTITY_STAGED_BIT>>24);
+    MAPPING_CREATE(scene->stagingBuffers, AV_MAX_THREADS);
     avRWLockCreate(&scene->entityIdLock);
     return scene;
 }
@@ -490,6 +514,10 @@ AV_API void sceneDestroy(Scene scene){
     avFree(scene->entityTable);
     avFree(scene->entityGeneration);
     avRWLockDestroy(scene->entityIdLock);
+    for(uint32 i = 0; i < MAPPING_SIZE(scene->stagingBuffers); i++){
+        stagingBufferDestroy(scene, scene->stagingBuffers[i].threadID);
+    }
+    MAPPING_DESTROY(scene->stagingBuffers);
     avFree(scene);
 
 }
@@ -586,7 +614,7 @@ static bool32 swapEntities(Scene scene, Entity entityA, Entity entityB){
     return true;
 }
 
-static uint32 getComponentIndex(EntityType* type, ComponentType component){
+uint32 getComponentIndex(EntityType* type, ComponentType component){
     if(type==NULL) return MAX_COMPONENT_COUNT;
     if(component >= MAX_COMPONENT_COUNT) return MAX_COMPONENT_COUNT;
     return type->componentIndex[component];
@@ -829,6 +857,33 @@ static Entity createLocalEntity(EntityType* type, EntityChunk** chunkPtr, uint32
     return localEntity;
 }
 
+bool32 createEmptyEntity(Scene scene, Entity entity, ComponentMask mask){
+    if(scene==NULL) return false;
+    if(entity==INVALID_ENTITY) return false;
+    bool8 isStaged = false;
+    if(!getEntityDetails(scene, entity, NULL, NULL, NULL, &isStaged)){
+        return false;
+    }
+    if(!isStaged) return false; //overwriting existing entity
+
+
+    EntityType* type = findEntityType(scene, mask);
+
+    if(type==NULL){
+        type = createEntityType(scene, mask);
+        if(type==NULL){
+            return INVALID_ENTITY;
+        }
+    }
+    uint32 localIndex = 0;
+    EntityChunk* chunk = NULL;
+    Entity localEntity = createLocalEntity(type, &chunk, &localIndex);
+    chunk->entities[localIndex] = entity;
+    if(localEntity==INVALID_ENTITY) return false;
+    modifyEntityID(scene, entity, localEntity, false);
+    return true;
+}
+
 static Entity createEntity(EntityType* type){
     if(type==NULL) return INVALID_ENTITY;
     
@@ -882,7 +937,44 @@ static bool32 entityChangeType(Scene scene, Entity entity, EntityType* dst, Comp
     return true;
 }
 
+void stagingBufferCreate(Scene scene, AvThreadID threadId){
+    if(scene == NULL || threadId >= AV_MAX_THREADS) return;
+
+    StagingBuffer buffer = {0};
+    buffer.threadID = threadId;
+    avAllocatorCreate(0, AV_ALLOCATOR_TYPE_DYNAMIC, &buffer.componentAllocator);
+    avAllocatorCreate(0, AV_ALLOCATOR_TYPE_DYNAMIC, &buffer.componentHandleAllocator);
+    buffer.entities = darrayCreate(StagedEntity);
+    MAPPING_INSERT(scene->stagingBuffers, threadId, buffer);
+}
+
+void stagingBufferDestroy(Scene scene, AvThreadID threadId){
+    if(darrayLength(scene->stagingBuffers[threadId].entities)){
+        return; // entities are still in use
+    }
+
+    avAllocatorDestroy(&scene->stagingBuffers[threadId].componentAllocator);
+    avAllocatorDestroy(&scene->stagingBuffers[threadId].componentHandleAllocator);
+    darrayDestroy(scene->stagingBuffers[threadId].entities);
+    scene->stagingBuffers[threadId].threadID = AV_MAIN_THREAD_ID;
+}
+
+StagingBufferHandle getStagingBuffer(Scene scene, AvThreadID threadId){
+    if(scene==NULL || threadId >= AV_MAX_THREADS) return NULL;
+    if(scene->stagingBuffers[threadId].threadID==AV_MAIN_THREAD_ID){
+        stagingBufferCreate(scene, threadId);
+        return scene->stagingBuffers + threadId;
+    }else{
+        return scene->stagingBuffers + threadId;
+    }
+}
+
 AV_API Entity entityCreate(Scene scene, ComponentInfoRef info){
+    AvThreadID threadId = avThreadGetID();
+    if(threadId!=AV_MAIN_THREAD_ID){
+        return stagedEntityCreate(scene, getStagingBuffer(scene, threadId), info);
+    }
+
 
     ComponentMask mask = {0};
     ComponentMask arrayMask = {0};
@@ -906,6 +998,11 @@ AV_API Entity entityCreate(Scene scene, ComponentInfoRef info){
 }
 
 AV_API bool32 entityAddComponent(Scene scene, Entity entity, ComponentInfoRef info){
+    AvThreadID threadId = avThreadGetID();
+    if(threadId != AV_MAIN_THREAD_ID){
+        return stagedEntityAddComponent(scene, getStagingBuffer(scene, threadId), entity, info);
+    }
+
     EntityType* type = getType(scene, entity);
     if(type==NULL){
         return false;
@@ -939,6 +1036,10 @@ AV_API bool32 entityAddComponent(Scene scene, Entity entity, ComponentInfoRef in
 }
 
 AV_API bool32 entityRemoveComponent(Scene scene, Entity entity, ComponentType component){
+    AvThreadID threadId = avThreadGetID();
+    if(threadId != AV_MAIN_THREAD_ID){
+        return stagedEntityRemoveComponent(scene, getStagingBuffer(scene, threadId), entity, component);
+    }
     EntityType* type = getType(scene, entity);
     if(type==NULL){
         return false;
@@ -959,24 +1060,39 @@ AV_API bool32 entityRemoveComponent(Scene scene, Entity entity, ComponentType co
 }
 
 AV_API bool32 entityDestroy(Scene scene, Entity entity){
-    if(scene==NULL) return false;
     if(entity==INVALID_ENTITY) return false;
-
+    AvThreadID threadId = avThreadGetID();
+    if(threadId != AV_MAIN_THREAD_ID){
+        return stagedEntityDestroy(scene, getStagingBuffer(scene, threadId), entity);
+    }
     return destroyEntity(scene, entity);
 }
 
 AV_API bool32 entityHasComponent(Scene scene, Entity entity, ComponentType component){
-    if(scene==NULL) return false;
     if(entity==INVALID_ENTITY) return false;
-    EntityType* type = getType(scene, entity);
+    bool8 isStaged = false;
+    LocalEntity localEntity = INVALID_ENTITY;
+    if(!getEntityDetails(scene, entity, NULL, &localEntity, NULL, &isStaged)) return false;
+    if(isStaged){
+        AvThreadID threadId = avThreadGetID();
+        if(threadId == AV_MAIN_THREAD_ID) return false;
+        return stagedEntityHasComponent(scene, getStagingBuffer(scene, threadId), entity, component);
+    }
+
+    EntityChunk* chunk = getLocalEntityChunk(localEntity);
+    EntityType* type = getEntityType(scene, chunk->entityType);
     if(type==NULL) return false;
     if(!MASK_HAS_COMPONENT(type->mask, component)) return false;
     return true;
 }
 
 AV_API void* entityGetComponent(Scene scene, Entity entity, ComponentType component){
+    AvThreadID threadId = avThreadGetID();
+    if(threadId!=AV_MAIN_THREAD_ID) return NULL;
+
     EntityType* type = getType(scene, entity);
     if(type==NULL) return NULL;
+    
 
     if(!MASK_HAS_COMPONENT(type->mask, component)) return NULL;
 
@@ -995,7 +1111,9 @@ AV_API void* entityGetComponent(Scene scene, Entity entity, ComponentType compon
 }
 
 
-AV_API void* entityGetComponentFast(Scene scene, Entity entity, ComponentType component, uint32 index){
+void* entityGetComponentFast(Scene scene, Entity entity, ComponentType component){
+    AvThreadID threadId = avThreadGetID();
+    if(threadId!=AV_MAIN_THREAD_ID) return NULL;
     EntityType* type = getType(scene, entity);
     EntityChunk* chunk = getEntityChunk(scene, entity);
     uint32 localIndex = getEntityLocalIndex(scene, entity);
@@ -1004,4 +1122,15 @@ AV_API void* entityGetComponentFast(Scene scene, Entity entity, ComponentType co
     byte* offset = NULL;
     offset = (byte*) chunk->components[compIndex];
     return offset + localIndex*size;
+}
+
+
+void sceneApply(Scene scene){
+    if(scene==NULL) return;
+    AvThreadID threadId = avThreadGetID();
+    if(threadId != AV_MAIN_THREAD_ID) return;
+
+    for(uint32 i = 0; i < MAPPING_SIZE(scene->stagingBuffers); i++){
+        if(scene->stagingBuffers[i].threadID==AV_MAIN_THREAD_ID)continue;
+    }
 }
