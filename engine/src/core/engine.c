@@ -4,6 +4,7 @@
 #include "core/input.h"
 #include "platform/platform.h"
 #include "renderer/renderer.h"
+#include "jobs/jobs.h"
 
 #include <AvUtils/avLogging.h>
 #include <AvUtils/avMemory.h>
@@ -41,9 +42,14 @@ bool8 engine_create(Application* game_inst) {
     engineState->is_running = false;
     engineState->is_suspended = false;
 
-    
-
-    if(engineState->game_inst->logSettings) setLogSettings(*engineState->game_inst->logSettings);
+    AvLogConfig logConfig = {0};
+    logConfig.queueSize = 4096;
+    logConfig.assertLevel = AV_ASSERT_LEVEL_NORMAL;
+    logConfig.level = AV_LOG_LEVEL_INFO;
+    logConfig.useColors = true;
+    avLogInit(&logConfig);
+    avLogAddSink(avLogConsoleSink, NULL);
+    //if(engineState->game_inst->logSettings) setLogSettings(*engineState->game_inst->logSettings);
 
     return true;
 }
@@ -54,6 +60,7 @@ void* eventMem = NULL;
 void* inputMem = NULL;
 void* platformMem = NULL;
 void* rendererMem = NULL;
+void* jobsystemMem = NULL;
 bool8 systemsInitialize(Application* game_inst){
     EventSystemConfig eventConfig = {0};
     eventConfig.maxIDs = 0xffff;
@@ -96,6 +103,12 @@ bool8 systemsInitialize(Application* game_inst){
     rendererMem = avAllocate(memSize, "");
     rendererStartup(&memSize, rendererMem, &rendererConfig);
 
+    JobSystemConfig jobsystemConfig = {
+        .maxWorkerThreads = 10,
+    };
+    jobSystemInitialize(&memSize, 0, &jobsystemConfig);
+    jobsystemMem = avAllocate(memSize, "");
+    jobSystemInitialize(&memSize, jobsystemMem, &jobsystemConfig);
 }
 
 void systemsUninitialize(){
@@ -107,6 +120,8 @@ void systemsUninitialize(){
     avFree(platformMem);
     rendererShutdown(rendererMem);
     avFree(rendererMem);
+    jobSystemDeinitialize(jobsystemMem);
+    avFree(jobsystemMem);
 }
 
 bool8 engine_run(Application* game_inst) {
@@ -238,6 +253,8 @@ bool8 engine_run(Application* game_inst) {
     //platformSystemShutdown(platformMem);
     systemsUninitialize();
     avFree(engineState);
+
+    avLogShutdown();
     return true;
 }
 

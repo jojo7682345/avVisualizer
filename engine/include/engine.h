@@ -23,7 +23,7 @@ typedef struct ApplicationConfig {
 typedef struct Application {
     /** @brief The application configuration. */
     ApplicationConfig appConfig;
-    AvLogSettings* logSettings;
+    //AvLogSettings* logSettings;
 
 
     /**

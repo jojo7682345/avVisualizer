@@ -137,8 +137,8 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
 		type = VALIDATION_MESSAGE_TYPE_PERFORMANCE;
 	}
 
-	logDeviceValidation("vulkan", level, type, pCallbackData->pMessage);
-
+	//logDeviceValidation("vulkan", level, type, pCallbackData->pMessage);
+    avLogVulkan("vulkan", type, level, "%s", pCallbackData->pMessage);
 	return VK_FALSE;
 }
 
@@ -735,7 +735,7 @@ bool8 rendererStartup(uint64* memoryRequirement, void* statePtr, void* config){
 
         VkResult result = vkCreateInstance(&createInfo, nullptr, &state->instance);
         if(result != VK_SUCCESS){
-            avAssert(false, true, "Failed to create instance");
+            avAssert(false, "Failed to create instance");
             darrayDestroy(requiredExtensions);
             darrayDestroy(requiredValidationLayerNames);
             return false;

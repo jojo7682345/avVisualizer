@@ -104,7 +104,7 @@ JobID localJobQueueRingPull(LocalJobQueueRing* queue){
     atomic_thread_fence(memory_order_seq_cst);
 
     uint32 top = atomic_load_explicit(&queue->top, memory_order_acquire);
-    if((int32)(top-bottom) <= 0){
+    if((int32)(bottom-top) < 0){
         queue->bottom =  top;
         return JOB_NONE;
     }
@@ -138,7 +138,7 @@ JobID localJobQueueRingSteal(LocalJobQueueRing* queue){
 
 void jobQueueInit(JobQueue* queue, uint32 size, JobSlot* backingArray){
     for(uint32 i = 0; i < JOB_PRIORITY_COUNT; i++){
-        jobQueueInit((JobQueueRing*)queue + i, size, backingArray + size*i);
+        jobQueueRingInit((JobQueueRing*)queue + i, size, backingArray + size*i);
     }
 }
 bool32 jobQueuePush(JobQueue* queue, JobPriority priority, JobID job){

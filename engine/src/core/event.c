@@ -330,6 +330,7 @@ static bool32 writeEvent(Event event, EventPipeline* pipeline){
     EventBatch* currentBatch = &state->eventPool.batches[pipeline->currentBatch];
     currentBatch->events[pipeline->currentSize++] = event;
     avMutexUnlock(pipeline->mutex);
+    return true;
 }
 
 static bool32 overwriteEvent(Event event, EventPipeline* pipeline){
@@ -344,6 +345,7 @@ static bool32 overwriteEvent(Event event, EventPipeline* pipeline){
     EventBatch* currentBatch = &state->eventPool.batches[pipeline->currentBatch];
     currentBatch->events[pipeline->currentSize++] = event;
     avMutexUnlock(pipeline->mutex);
+    return true;
 }
 
 static bool32 addEvent(Event event, bool32 (writeEventFn)(Event,EventPipeline*)){

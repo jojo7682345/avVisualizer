@@ -1,5 +1,6 @@
 #include <entry.h>
 #include <ecs/ecs.h>
+#include <jobs/jobs.h>
 
 extern bool8 renderFrameCpp(struct Application*);
 
@@ -22,19 +23,27 @@ typedef struct BarComponent {
 
 void fooConstructor(Scene scene, Entity entity, void* component, uint32 size,  ComponentInfo* info){
     ((FooComponent*)component)->a = 2;
-    avLog(AV_DEBUG, "Initialized foo component of entity %x, with %u", entity, ((FooComponent*)component)->a);
+    //avLog(AV_DEBUG, "Initialized foo component of entity %x, with %u", entity, ((FooComponent*)component)->a);
 }
 void fooDestructor(Scene scene, Entity entity, void* component, uint32 size){
-    avLog(AV_DEBUG, "Uninitialized foo component of entity %x, with %u", entity, ((FooComponent*)component)->a);
+    //avLog(AV_DEBUG, "Uninitialized foo component of entity %x, with %u", entity, ((FooComponent*)component)->a);
 }
 
 void barConstructor(Scene scene, Entity entity, void* component, uint32 size, ComponentInfo* info){
     ((BarComponent*)component)->a = 2;
     ((BarComponent*)component)->b = 3;
-    avLog(AV_DEBUG, "Initialized bar component of entity %x, with %u %u", entity, ((BarComponent*)component)->a, ((BarComponent*)component)->b);
+    //avLog(AV_DEBUG, "Initialized bar component of entity %x, with %u %u", entity, ((BarComponent*)component)->a, ((BarComponent*)component)->b);
 }
 void barDestructor(Scene scene, Entity entity, void* component, uint32 size){
-    avLog(AV_DEBUG, "Uninitialized bar component of entity %x, with %u %u", entity, ((BarComponent*)component)->a, ((BarComponent*)component)->b);
+    //avLog(AV_DEBUG, "Uninitialized bar component of entity %x, with %u %u", entity, ((BarComponent*)component)->a, ((BarComponent*)component)->b);
+}
+
+#include <AvUtils/avThreading.h>
+JobControl exampleJob(byte* input, uint32 inputSize, byte* output, uint32 outputSize, JobContext* context){
+    //avDebug("Hello from worker thread %u", context->threadId);
+    for(uint32 i = 0; i < 10000000; i++){
+    }
+    JOB_EXIT_SUCCESS();
 }
 
 
@@ -85,6 +94,17 @@ bool8 initialize(struct Application* app){
     avLog(AV_DEBUG, "Entity %x has %u foo components", a, entityHasComponent(scene, a, COMPONENT_TYPE_FOO));
 
     sceneApply(scene);
+
+
+    JobBatchDescription batch = {
+        .size = 1024*12,
+        .entry = exampleJob,
+        .priority = JOB_PRIORITY_MEDIUM,
+    };
+    submitJobBatch(&batch);
+
+
+
     return true;
 }
 
@@ -126,22 +146,22 @@ uint disabledLogMessageCount = sizeof(disabledLogMessages) / sizeof(AvResult);
 // Define the function to create a game
 bool8 create_application(Application* out_application) {
 
-    AvLogSettings logSettings = avLogSettingsDefault;
-	logSettings.printSuccess = false;
-	logSettings.printCode = false;
-	logSettings.printAssert = false;
-	logSettings.printType = true;
-	logSettings.printFunc = false;
-	logSettings.printError = true;
-	logSettings.printCategory = false;
-	logSettings.colors = true;
-	logSettings.disabledCategories = disabledLogCategories;
-	logSettings.disabledCategoryCount = disabledLogCategoryCount;
-	logSettings.disabledMessages = disabledLogMessages;
-	logSettings.disabledMessageCount = disabledLogMessageCount;
-	logSettings.validationLevel = AV_VALIDATION_LEVEL_WARNINGS_AND_ERRORS;
-	logSettings.level = AV_LOG_LEVEL_ALL;
-    out_application->logSettings = &logSettings;
+    // AvLogSettings logSettings = avLogSettingsDefault;
+	// logSettings.printSuccess = false;
+	// logSettings.printCode = false;
+	// logSettings.printAssert = false;
+	// logSettings.printType = true;
+	// logSettings.printFunc = false;
+	// logSettings.printError = true;
+	// logSettings.printCategory = false;
+	// logSettings.colors = true;
+	// logSettings.disabledCategories = disabledLogCategories;
+	// logSettings.disabledCategoryCount = disabledLogCategoryCount;
+	// logSettings.disabledMessages = disabledLogMessages;
+	// logSettings.disabledMessageCount = disabledLogMessageCount;
+	// logSettings.validationLevel = AV_VALIDATION_LEVEL_WARNINGS_AND_ERRORS;
+	// logSettings.level = AV_LOG_LEVEL_ALL;
+    //out_application->logSettings = &logSettings;
 
     // Application configuration.
     out_application->appConfig.startPosX = 100;
