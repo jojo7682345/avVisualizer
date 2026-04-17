@@ -3,6 +3,8 @@
 #include "defines.h"
 #include <stdatomic.h>
 
+typedef uint64 JobBatchID;
+#define JOB_BATCH_NONE ((JobBatchID)-1)
 typedef uint32 JobID;
 #define JOB_NONE ((JobID)-1)
 
@@ -54,9 +56,11 @@ typedef struct JobControl {
 typedef JobControl (*JobEntry)(byte* input, uint32 inputSize, byte* output, uint32 outputSize, JobContext* context);
 typedef void (*JobResultCallback)(byte* output, uint32 outputSize, JobContext* context);
 
+typedef struct JobFence* JobFence;
+
 typedef struct JobBatchDescription {
     uint32 size;
-    JobID id;
+    JobBatchID id;
     JobPriority priority;
     byte* inputData;
     uint32 inputStride;
@@ -67,7 +71,8 @@ typedef struct JobBatchDescription {
     JobResultCallback onSuccess;
     JobResultCallback onFailure;
     uint32 dependencyCount;
-    JobID* dependencies;
+    JobBatchID* dependencies;
+    JobFence fence;
 } JobBatchDescription;
 
 typedef struct JobSystemConfig {
@@ -117,7 +122,14 @@ typedef struct JobSystemConfig {
 
 bool32 jobSystemInitialize(uint64* memoryRequirement, void* statePtr, void* configPtr);
 void jobSystemDeinitialize(void* statePtr);
-bool32 submitJobBatch(JobBatchDescription* batch);
+
+void jobFenceCreate(JobFence* fence);
+void jobFenceDestroy(JobFence fence);
+void jobFenceWait(JobFence fence);
+
+bool32 submitJobBatch(JobBatchDescription* batch, JobFence fence);
+
+
 
 // JobControl exampleJob(byte* input, uint32 inputSize, byte* output, uint32 outputSize, JobContext context){
 //     JOB_LOCAL(uint32, a);

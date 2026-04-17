@@ -3,7 +3,7 @@
 
 typedef struct JobSlot {
     _Atomic uint32 sequence;
-    JobID data;
+    JobBatchID data;
 } JobSlot;
 
 typedef struct JobQueueRing {
@@ -32,5 +32,5 @@ JobID localJobQueuePull(LocalJobQueue* queue, JobPriority priority);
 JobID localJobQueueSteal(LocalJobQueue* queue, JobPriority priority);
 
 void jobQueueInit(JobQueue* queue, uint32 size, JobSlot* backingArray);
-bool32 jobQueuePush(JobQueue* queue, JobPriority priority, JobID job);
-JobID jobQueuePull(JobQueue* queue, JobPriority priority);
+bool32 jobQueuePush(JobQueue* queue, JobPriority priority, JobBatchID job);
+JobBatchID jobQueuePull(JobQueue* queue, JobPriority priority);

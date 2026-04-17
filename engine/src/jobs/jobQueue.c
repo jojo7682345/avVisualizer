@@ -11,7 +11,7 @@ void jobQueueRingInit(JobQueueRing* queue, uint32 size, JobSlot* backingArray){
     }
 }
 
-bool32 jobQueueRingPush(JobQueueRing* queue, JobID job){
+bool32 jobQueueRingPush(JobQueueRing* queue, JobBatchID job){
     JobSlot* slot;
     uint32 pos;
     while(1){
@@ -36,7 +36,7 @@ bool32 jobQueueRingPush(JobQueueRing* queue, JobID job){
     return true;
 }
 
-JobID jobQueueRingPull(JobQueueRing* queue){
+JobBatchID jobQueueRingPull(JobQueueRing* queue){
     JobSlot* slot;
     uint32 pos;
     while(1){
@@ -50,12 +50,12 @@ JobID jobQueueRingPull(JobQueueRing* queue){
                 break;
             }
         }else if(diff < 0){
-            return JOB_NONE;
+            return JOB_BATCH_NONE;
         }
         //retry
     }
 
-    JobID job = slot->data;
+    JobBatchID job = slot->data;
     atomic_store_explicit(&slot->sequence, pos + queue->mask + 1, memory_order_release);
     return job;
 }
@@ -141,10 +141,10 @@ void jobQueueInit(JobQueue* queue, uint32 size, JobSlot* backingArray){
         jobQueueRingInit((JobQueueRing*)queue + i, size, backingArray + size*i);
     }
 }
-bool32 jobQueuePush(JobQueue* queue, JobPriority priority, JobID job){
+bool32 jobQueuePush(JobQueue* queue, JobPriority priority, JobBatchID job){
     return jobQueueRingPush((JobQueueRing*)queue  + priority, job);
 }
-JobID jobQueuePull(JobQueue* queue, JobPriority priority){
+JobBatchID jobQueuePull(JobQueue* queue, JobPriority priority){
     return jobQueueRingPull((JobQueueRing*)queue + priority);
 }
 

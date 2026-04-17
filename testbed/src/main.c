@@ -38,11 +38,16 @@ void barDestructor(Scene scene, Entity entity, void* component, uint32 size){
     //avLog(AV_DEBUG, "Uninitialized bar component of entity %x, with %u %u", entity, ((BarComponent*)component)->a, ((BarComponent*)component)->b);
 }
 
+volatile uint32 completedWork[12] = {0, 0};
+
 #include <AvUtils/avThreading.h>
 JobControl exampleJob(byte* input, uint32 inputSize, byte* output, uint32 outputSize, JobContext* context){
     //avDebug("Hello from worker thread %u", context->threadId);
-    for(uint32 i = 0; i < 10000000; i++){
-    }
+    // for(uint32 i = 0; i < 10000000; i++){
+    // }
+    avThreadSleep(10);
+    completedWork[context->threadId]++;
+    //avDebug("Thread %u completed %u jobs", context->threadId, completedWork[context->threadId]);
     JOB_EXIT_SUCCESS();
 }
 
@@ -97,11 +102,11 @@ bool8 initialize(struct Application* app){
 
 
     JobBatchDescription batch = {
-        .size = 1024*12,
+        .size = 4096,
         .entry = exampleJob,
-        .priority = JOB_PRIORITY_MEDIUM,
+        .priority = JOB_PRIORITY_MAX,
     };
-    submitJobBatch(&batch);
+    submitJobBatch(&batch, NULL);
 
 
 

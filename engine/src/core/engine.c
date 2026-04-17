@@ -104,7 +104,7 @@ bool8 systemsInitialize(Application* game_inst){
     rendererStartup(&memSize, rendererMem, &rendererConfig);
 
     JobSystemConfig jobsystemConfig = {
-        .maxWorkerThreads = 10,
+        .maxWorkerThreads = 11,
     };
     jobSystemInitialize(&memSize, 0, &jobsystemConfig);
     jobsystemMem = avAllocate(memSize, "");
