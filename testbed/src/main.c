@@ -100,13 +100,24 @@ bool8 initialize(struct Application* app){
 
     sceneApply(scene);
 
+    JobFence fence; 
+    jobFenceCreate(&fence);
 
     JobBatchDescription batch = {
         .size = 4096,
         .entry = exampleJob,
         .priority = JOB_PRIORITY_MAX,
     };
-    submitJobBatch(&batch, NULL);
+    JobBatchID id = submitJobBatch(&batch, fence);
+    //wait untill id is already completed;
+    jobFenceWait(fence);
+
+    //JobBatchID id2 = submitJobBatch(&batch, NULL);
+    JobBatchID ids[2] = {id, 0};
+    submitJobBatchWithDependencies(&batch, 1, ids, NULL);
+
+    //jobFenceWait(fence);
+    jobFenceDestroy(fence);
 
 
 

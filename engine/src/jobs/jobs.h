@@ -49,7 +49,6 @@ typedef enum JobControlReturn {
 typedef struct JobControl {
     JobControlReturn ret;
     uint32 nextSection;
-    JobPriority priorityHint;
 } JobControl;
 
 // Job control
@@ -60,7 +59,6 @@ typedef struct JobFence* JobFence;
 
 typedef struct JobBatchDescription {
     uint32 size;
-    JobBatchID id;
     JobPriority priority;
     byte* inputData;
     uint32 inputStride;
@@ -70,8 +68,6 @@ typedef struct JobBatchDescription {
     JobEntry entry;
     JobResultCallback onSuccess;
     JobResultCallback onFailure;
-    uint32 dependencyCount;
-    JobBatchID* dependencies;
     JobFence fence;
 } JobBatchDescription;
 
@@ -79,6 +75,7 @@ typedef struct JobSystemConfig {
     uint32 maxWorkerThreads;
 } JobSystemConfig;
 
+#define JOB_MAX_DEPENDENTS 8
 #define JOB_STATE_SIZE 4096
 
 #define JOB_START JobControl __job_control = {.ret=JOB_EXIT_NONE, }; switch(context->exec.section){ case 0:{
@@ -127,9 +124,10 @@ void jobFenceCreate(JobFence* fence);
 void jobFenceDestroy(JobFence fence);
 void jobFenceWait(JobFence fence);
 
-bool32 submitJobBatch(JobBatchDescription* batch, JobFence fence);
-
-
+JobBatchID submitJobBatch(JobBatchDescription* batch, JobFence fence);
+JobBatchID submitJobBatchWithDependencies(JobBatchDescription* batch, uint32 dependencyCount, JobBatchID* dependencies, JobFence fence);
+JobBatchID submitJobBatchAfter(JobBatchDescription* batch, uint32 ms, JobFence fence);
+JobBatchID submitJobBatchAfterWithDependencies(JobBatchDescription* batch, uint32 dependencyCount, JobBatchID* dependencies, uint32 ms, JobFence fence);
 
 // JobControl exampleJob(byte* input, uint32 inputSize, byte* output, uint32 outputSize, JobContext context){
 //     JOB_LOCAL(uint32, a);

@@ -3,104 +3,10 @@
 #define AV_LOG_CATEGORY "job system" 
 #include "logging.h"
 
-#include <AvUtils/avThreading.h>
-#include <AvUtils/threading/avSemaphore.h>
-#include <AvUtils/threading/avConditionVariable.h>
-#include <AvUtils/avMemory.h>
-#include <AvUtils/threading/avRwLock.h>
-#include <AvUtils/avMath.h>
-#include <AvUtils/avString.h>
-typedef enum JobState {
-    JOB_STATE_READY, // ready to be executed
-    JOB_STATE_EXECUTING, // currently executing
-    JOB_STATE_DONE, // complted executing
-} JobState;
+#include "jobsInternal.h"
 
-
-typedef struct JobInstance {
-    _Atomic JobState state;
-    JobPriority priority;
-    JobBatchID batch;
-//    JobPriority effectivePriority; // priority inheritance
-    byte* input;
-    byte* output;
-    uint32 inputSize;
-    uint32 outputSize;
-    JobEntry entry;
-    JobResultCallback onSuccess;
-    JobResultCallback onFailure;
-    byte* runState;
-    uint32 stateSize;
-    _Atomic WorkerThreadID workerThread;
-} JobInstance;
-
-
-#define LOCAL_QUEUE_RING_SIZE 1024
-#define LOCAL_QUEUE_SIZE LOCAL_QUEUE_RING_SIZE*JOB_PRIORITY_COUNT
-#define GLOBAL_QUEUE_RING_SIZE 4096
-#define GLOBAL_QUEUE_SIZE GLOBAL_QUEUE_RING_SIZE*JOB_PRIORITY_COUNT
-#define MAX_CORE_COUNT 32
-#define JOB_INSTANCE_POOL_SIZE GLOBAL_QUEUE_SIZE + LOCAL_QUEUE_SIZE * MAX_CORE_COUNT / 2
-
-typedef struct JobInstancePool {
-    _Atomic uint32 jobCount;
-    uint32 jobIndex[JOB_INSTANCE_POOL_SIZE];
-    JobID jobReference[JOB_INSTANCE_POOL_SIZE];
-    struct JobInstancePoolSlot {
-        JobInstance instance;
-        struct JobData {
-            JobExecutionContext context;
-            byte state[JOB_STATE_SIZE];
-        } jobData;
-    }jobs[JOB_INSTANCE_POOL_SIZE];
-    AvRwLock lock;
-} JobInstancePool;
 JobInstancePool jobInstancePool = {0};
-
-typedef struct JobBatchPool {
-    uint32 jobBatchCount;
-    uint32 jobBatchIndex[JOB_INSTANCE_POOL_SIZE];
-    union JobBatchReferenceSlot {
-        JobBatchID id;
-        union {
-            uint32 generation;
-            uint32 identifier;
-        };
-    } jobBatchReference[JOB_INSTANCE_POOL_SIZE];
-    struct JobBatchPoolSlot {
-        JobBatchDescription batch;
-        _Atomic uint32 remainingJobs;
-    } jobBatches[JOB_INSTANCE_POOL_SIZE];
-    AvRwLock lock;
-} JobBatchPool;
-JobBatchPool jobBatchPool = {0};
-
-struct JobFence {
-    _Atomic uint32 workLeft;
-};
-
-typedef struct WorkerThread {
-    AvThread thread;
-    LocalJobQueue localQueue;
-    uint32 id;
-    // keep batch around that we have already split of some jobs, so that we dont have to push it to the back of the queue again
-    // threads that try to steal, first try to steal the batch instead of from the local queue to prevent congestion
-    _Atomic JobBatchID workingOnBatch[JOB_PRIORITY_COUNT]; 
-} WorkerThread;
-
-typedef struct JobSystemState {
-    WorkerThread* threads;
-    uint32 threadCount;
-    JobQueue jobQueue;
-    AvSemaphore workPresent;
-    //AvSemaphore priorityPresent[JOB_PRIORITY_COUNT];
-    bool8 awaitingExit;
-    _Atomic uint32 activeThreads;
-} JobSystemState;
-
-static JobSystemState* state = NULL;
-
-
+JobSystemState* state = NULL;
 
 int32 workerThreadEntry(byte* data, uint64 size);
 bool32 jobSystemInitialize(uint64* memoryRequirement, void* statePtr, void* configPtr){
@@ -111,7 +17,7 @@ bool32 jobSystemInitialize(uint64* memoryRequirement, void* statePtr, void* conf
 
     JobSystemConfig* config = (JobSystemConfig*) configPtr;
     
-    state->threadCount = config->maxWorkerThreads + 1; // +1 for main thread that optionally might help in execution
+    state->threadCount = config->maxWorkerThreads;
     uint32 threadsSize = sizeof(WorkerThread) * state->threadCount;
     uint32 localQueueSize = sizeof(JobID) * LOCAL_QUEUE_SIZE * state->threadCount;
     uint32 globalQueueSize = sizeof(JobSlot) * GLOBAL_QUEUE_SIZE;
@@ -121,17 +27,19 @@ bool32 jobSystemInitialize(uint64* memoryRequirement, void* statePtr, void* conf
     JobSlot* jobbatchSlots = (JobSlot*)(jobsBuffer + LOCAL_QUEUE_SIZE * state->threadCount);
     for(uint32 i = 0; i < state->threadCount; i++){
         state->threads[i] = (WorkerThread){0};
-        if(i != 0){ 
-            avThreadCreate(workerThreadEntry, &threads[i].thread);
-            char buffer[16] = {0};
-            avStringPrintfToBuffer(buffer, 16, AV_CSTRA("Worker %u"), i);
-            avThreadSetName(threads[i].thread, buffer);
-        }
+        avThreadCreate(workerThreadEntry, &threads[i].thread);
+        char buffer[16] = {0};
+        avStringPrintfToBuffer(buffer, 16, AV_CSTRA("Worker %u"), i);
+        avThreadSetName(threads[i].thread, buffer);
         localJobQueueInit(&threads[i].localQueue, LOCAL_QUEUE_RING_SIZE, jobsBuffer + LOCAL_QUEUE_SIZE*i);
+        for(uint32 j = 0; j < JOB_PRIORITY_COUNT; j++){
+            atomic_store_explicit(&threads[i].workingOnBatch[j], JOB_BATCH_NONE, memory_order_release);
+        }
     }
     jobQueueInit(&state->jobQueue, GLOBAL_QUEUE_RING_SIZE, jobbatchSlots);
 
-    avRWLockCreate(&jobBatchPool.lock);
+    jobBatchPoolInit();
+
     avRWLockCreate(&jobInstancePool.lock);
     avSemaphoreCreate(&state->workPresent, 0);
     atomic_store(&state->activeThreads, 0);
@@ -139,53 +47,46 @@ bool32 jobSystemInitialize(uint64* memoryRequirement, void* statePtr, void* conf
     for(uint32 i = 0; i < JOB_INSTANCE_POOL_SIZE; i++){
         jobInstancePool.jobIndex[i] = i;
         jobInstancePool.jobReference[i] = i;
-        jobBatchPool.jobBatchIndex[i] = i;
-        jobBatchPool.jobBatchReference[i] = (union JobBatchReferenceSlot){.generation=0, .identifier=i};
     }
 
-    // for(uint32 i = 0; i < JOB_PRIORITY_COUNT; i++){
-    //     avSemaphoreCreate(&state->priorityPresent[i], 0);
-    // }
+    for(uint32 i = 0; i < JOB_PRIORITY_COUNT; i++){
+        atomic_store(&state->exchange[i], JOB_NONE);
+    }
     
 
-    for(uint32 i = 1; i < state->threadCount; i++){
+    for(uint32 i = 0; i < state->threadCount; i++){
         avThreadStart(NULL, i, state->threads[i].thread);
     }
 
     return true;
 }
 
-void jobSystemDeinitialize(void* statePtr){
-    if(state==NULL) return;
-    
+void finishAndExit(){
+    jobFenceWait(&state->allWorkDoneFence);
     state->awaitingExit = true;
-
     for(uint32 i = 0; i < state->threadCount; i++){
         avSemaphorePost(state->workPresent);
     }
+}
 
-    
+void jobSystemDeinitialize(void* statePtr){
+    if(state==NULL) return;
 
-    // for(uint32 i = 0; i < JOB_PRIORITY_COUNT; i++){
-    //     avSemaphoreDestroy(state->priorityPresent[i]);
-    // }
-    
-    for(uint32 i = 1; i < state->threadCount; i++){
+    finishAndExit();
+
+    for(uint32 i = 0; i < state->threadCount; i++){
         avThreadDestroy(state->threads[i].thread);
     }
+    avDebug("All work is completed");
 
     avSemaphoreDestroy(state->workPresent);
     avRWLockDestroy(jobInstancePool.lock);
-    avRWLockDestroy(jobBatchPool.lock);
+    jobBatchPoolDeinit();
 
     avFree(state->threads);
 
-
     if(jobInstancePool.jobCount){
         avError("%u jobs are still active", jobInstancePool.jobCount);
-    }
-    if(jobBatchPool.jobBatchCount){
-        avError("%u batches are still active", jobBatchPool.jobBatchCount);
     }
 }
 
@@ -234,103 +135,6 @@ JobID allocateJob(JobInstance* instance){
     return id;
 }
 
-JobBatchID allocateJobBatch(JobBatchDescription* description){
-    avRWLockReadLock(jobBatchPool.lock);
-    uint32 index = atomic_fetch_add(&jobBatchPool.jobBatchCount, 1);
-    if(index >= JOB_INSTANCE_POOL_SIZE){
-        atomic_store_explicit(&jobBatchPool.jobBatchCount, JOB_INSTANCE_POOL_SIZE, memory_order_relaxed);
-        avRWLockReadUnlock(jobBatchPool.lock);
-        return JOB_BATCH_NONE;
-    }
-    avMemset(jobBatchPool.jobBatches + index, 0, sizeof(struct JobBatchPoolSlot));
-    avMemcpy(&(jobBatchPool.jobBatches + index)->batch, description, sizeof(JobBatchDescription));
-    jobBatchPool.jobBatches[index].remainingJobs = description->size;
-    JobBatchID id = jobBatchPool.jobBatchReference[index].id;
-    atomic_thread_fence(memory_order_release);
-    avRWLockReadUnlock(jobBatchPool.lock);
-    return id;
-}
-
-bool32 signalJobComplete(JobBatchID batch){
-    avRWLockReadLock(jobBatchPool.lock);
-    uint32 identifier = ((union JobBatchReferenceSlot)batch).identifier;
-    uint32 generation = ((union JobBatchReferenceSlot)batch).generation;
-    uint32 index = jobBatchPool.jobBatchIndex[identifier];
-    if(generation != jobBatchPool.jobBatchReference[index].generation){
-        avError("Accessed expired handle");
-        avRWLockReadUnlock(jobBatchPool.lock);
-        return false;
-    }
-    uint32 remainingJobs = atomic_fetch_sub_explicit(&jobBatchPool.jobBatches[index].remainingJobs, 1, memory_order_seq_cst) - 1;
-    avRWLockReadUnlock(jobBatchPool.lock);
-    if(remainingJobs == 0){
-        return true;
-    }
-    return false;
-}
-
-void getJobBatch(JobBatchID id, JobBatchDescription* batch){
-    avRWLockReadLock(jobBatchPool.lock);
-    uint32 identifier = ((union JobBatchReferenceSlot)id).identifier;
-    uint32 generation = ((union JobBatchReferenceSlot)id).generation;
-    uint32 index = jobBatchPool.jobBatchIndex[identifier];
-    if(generation != jobBatchPool.jobBatchReference[index].generation){
-        avError("Accessed expired handle");
-        avRWLockReadUnlock(jobBatchPool.lock);
-        return;
-    }
-    JobBatchDescription* target = &jobBatchPool.jobBatches[index].batch;
-    avMemcpy(batch, target, sizeof(JobBatchDescription));
-    avRWLockReadUnlock(jobBatchPool.lock);
-}
-
-void onBatchComplete(JobBatchID batch){
-    avRWLockReadLock(jobBatchPool.lock);
-    avDebug("JobBatch %u is complete", batch);
-    JobBatchDescription description;
-    getJobBatch(batch, &description);
-    avRWLockReadUnlock(jobBatchPool.lock);
-
-    if(description.fence){
-        atomic_fetch_sub(&description.fence->workLeft, 1);
-    }
-}
-
-void freeJobBatch(JobBatchID batch){
-    onBatchComplete(batch);
-
-    avRWLockWriteLock(jobBatchPool.lock);
-    atomic_thread_fence(memory_order_acquire);
-    uint32 identifier = ((union JobBatchReferenceSlot)batch).identifier;
-    uint32 generation = ((union JobBatchReferenceSlot)batch).generation;
-    uint32 index = jobBatchPool.jobBatchIndex[identifier];
-    if(generation != jobBatchPool.jobBatchReference[index].generation){
-        avError("Accessed expired handle");
-        avRWLockWriteUnlock(jobBatchPool.lock);
-        return;
-    }
-    jobBatchPool.jobBatchReference[index].generation++;
-
-    uint32 lastIndex = jobBatchPool.jobBatchCount - 1;
-    if(index == lastIndex){
-        jobBatchPool.jobBatchCount--;
-        atomic_thread_fence(memory_order_release);
-        avRWLockWriteUnlock(jobBatchPool.lock);
-        return;
-    }
-    union JobBatchReferenceSlot lastId = jobBatchPool.jobBatchReference[lastIndex];
-    union JobBatchReferenceSlot currentId = jobBatchPool.jobBatchReference[index];
-    jobBatchPool.jobBatchReference[index] = lastId;
-    jobBatchPool.jobBatchReference[lastIndex] = currentId;
-    jobBatchPool.jobBatchIndex[lastId.id] = index;
-    jobBatchPool.jobBatchIndex[identifier] = lastIndex;
-    avMemswap(jobBatchPool.jobBatches + index, jobBatchPool.jobBatches + lastIndex, sizeof(struct JobBatchPoolSlot));
-    jobBatchPool.jobBatchCount--;
-    atomic_thread_fence(memory_order_release);
-    avRWLockWriteUnlock(jobBatchPool.lock);
-
-}
-
 void freeJob(JobID job){
     avRWLockWriteLock(jobInstancePool.lock);
     atomic_thread_fence(memory_order_acquire);
@@ -356,22 +160,8 @@ signalComplete:
     if(signalJobComplete(batch)){
         // all work from batch is completed
         freeJobBatch(batch);
+        atomic_fetch_sub(&state->allWorkDoneFence.workLeft, 1);
     }
-}
-
-void writeJobBatch(JobBatchID id, JobBatchDescription* batch){
-    avRWLockReadLock(jobBatchPool.lock);
-    uint32 identifier = ((union JobBatchReferenceSlot)id).identifier;
-    uint32 generation = ((union JobBatchReferenceSlot)id).generation;
-    uint32 index = jobBatchPool.jobBatchIndex[identifier];
-    if(generation != jobBatchPool.jobBatchReference[index].generation){
-        avError("Accessed expired handle");
-        avRWLockReadUnlock(jobBatchPool.lock);
-        return;
-    }
-    JobBatchDescription* target = &jobBatchPool.jobBatches[index].batch;
-    avMemcpy(target, batch, sizeof(JobBatchDescription));
-    avRWLockReadUnlock(jobBatchPool.lock);
 }
 
 
@@ -401,16 +191,14 @@ struct batchSplit{uint32 count; uint32 remainingCount; } splitJobBatch(JobID* jo
     uint32 jobsToConsume = AV_MIN(maxJobs, jobBatch.size);
     for(uint32 i = 0; i < jobsToConsume; i++){
         JobInstance jobBuffer;
-        jobBuffer.entry = jobBatch.entry;
+        //jobBuffer.entry = jobBatch.entry;
         jobBuffer.input = jobBatch.inputData + jobBatch.inputStride * i;
         jobBuffer.output = jobBatch.outputData + jobBatch.outputStride * i;
-        jobBuffer.inputSize = jobBatch.outputStride;
+        jobBuffer.inputSize = jobBatch.inputStride;
         jobBuffer.outputSize = jobBatch.outputStride;
-        jobBuffer.onFailure = jobBatch.onFailure;
-        jobBuffer.onSuccess = jobBatch.onSuccess;
-        jobBuffer.priority = jobBatch.priority;
-        jobBuffer.state = JOB_STATE_READY;
-        jobBuffer.workerThread = workerThreadId;
+        //jobBuffer.onFailure = jobBatch.onFailure;
+        //jobBuffer.onSuccess = jobBatch.onSuccess;
+        //jobBuffer.priority = jobBatch.priority;
         jobBuffer.batch = batch;
         jobs[i] = allocateJob(&jobBuffer);
     }
@@ -504,8 +292,7 @@ JobID getJobFromGlobalQueue(JobQueue* globalQueue, LocalJobQueue* localQueue, Jo
     return pushJobsToLocalQueue(jobs, jobCount, priority, localQueue);
 }
 
-JobID stealJobFromOtherThread(WorkerThreadID threadId, uint32* stealIndex, JobPriority priority, LocalJobQueue* localQueue){
-    JobID job = JOB_NONE;
+JobID stealBatchFromOtherThread(WorkerThreadID threadId, uint32* stealIndex, JobPriority priority, LocalJobQueue* localQueue){
     for(uint32 i = 0; i < state->threadCount; i++){
         uint32 index = ((*stealIndex) + i) % state->threadCount;
         if(index == threadId) continue;
@@ -515,19 +302,32 @@ JobID stealJobFromOtherThread(WorkerThreadID threadId, uint32* stealIndex, JobPr
         if(batch!=JOB_BATCH_NONE){
             JobID jobs[LOCAL_QUEUE_RING_SIZE] = {JOB_NONE};
             uint32 jobCount = processJobBatchIntoBuffer(batch, threadId, priority, jobs, LOCAL_QUEUE_RING_SIZE);
+            *stealIndex = (index + 1) % state->threadCount;
             return pushJobsToLocalQueue(jobs, jobCount, priority, localQueue);
         }
+    }
+    return JOB_NONE;
+}
 
-        // try to steal from local queue
+JobID stealJobFromOtherThreadsLocalQueue(WorkerThreadID threadId, uint32* stealIndex, JobPriority priority){
+    JobID job = JOB_NONE;
+    for(uint32 i = 0; i < state->threadCount; i++){
+        uint32 index = ((*stealIndex) + i) % state->threadCount;
+        if(index == threadId) continue;
         job = localJobQueueSteal(&state->threads[index].localQueue, priority);
         if(job != JOB_NONE){
             *stealIndex = (index + 1) % state->threadCount;
             break;
         }
     }
-    // if(job!=JOB_NONE){
-    //     avDebug("Job stolen");
-    // }
+    return job;
+}
+
+JobID stealJobFromOtherThread(WorkerThreadID threadId, uint32* stealIndex, JobPriority priority, LocalJobQueue* localQueue){
+    JobID job = JOB_NONE;
+    job = stealBatchFromOtherThread(threadId, stealIndex, priority, localQueue);
+    if(job != JOB_NONE) return job;
+    job = stealJobFromOtherThreadsLocalQueue(threadId, stealIndex, priority);
     return job;
 }
 
@@ -535,9 +335,6 @@ bool32 waitForWork(WorkerThreadID threadId){
     WorkerThread* thread = &state->threads[threadId];
     uint32 activeThreads = atomic_fetch_sub(&state->activeThreads, 1)-1;
     //avLog(AV_DEBUG_INFO, "Worker thread %u awaiting work. %u active threads", threadId, activeThreads);
-    if(threadId==0){
-        return true;
-    }
     avSemaphoreWait(state->workPresent);
     atomic_fetch_add(&state->activeThreads, 1);
     if(state->awaitingExit){
@@ -555,6 +352,8 @@ JobID selectJob(WorkerThreadID threadId, JobQueue* globalQueue, LocalJobQueue* l
     JobPriority priority = JOB_PRIORITY_MAX;
     JobID job = JOB_NONE;
     for(; priority <= JOB_PRIORITY_MIN; priority++){
+        job = atomic_exchange(&state->exchange[priority], JOB_NONE);
+        if(job!=JOB_NONE) break;
         job = localJobQueuePull(localQueue, priority);
         if(job!=JOB_NONE) break;
         job = getJobFromWorkinOnBatch(threadId, priority, localQueue);
@@ -568,66 +367,138 @@ JobID selectJob(WorkerThreadID threadId, JobQueue* globalQueue, LocalJobQueue* l
     return job;
 }
 
-void executeJob(JobID job, WorkerThreadID threadId, JobPriority priority, LocalJobQueue* localQueue, JobQueue* globalQueue){
-executeJob:
-    //avDebug("Worker thread %u is executing job", threadId);
-    JobInstance instance;
-    struct JobData jobData;
-    getJobInstance(job, &instance, &jobData);
-    JobContext context = {
-        .state = jobData.state,
-    };
-    context.stateSize = JOB_STATE_SIZE;
-    context.threadId = threadId;
-runJobSection:
-    context.priority = priority;
-    context.stateOffset = 0;
-    context.shouldYield = priority!=JOB_PRIORITY_MAX; // highest priority should never yield as there is nothing that could interrupt it
-    context.exec.section = jobData.context.section;
-    context.exec.subsection = jobData.context.subsection;
+JobID selectJobForMainThread(uint32* stealIndex, JobPriority* priorityPtr){
+    JobPriority priority = JOB_PRIORITY_MAX;
+    JobID job = JOB_NONE;
+    for(; priority <= JOB_PRIORITY_MIN; priority++){
+        job = atomic_exchange(&state->exchange[priority], JOB_NONE);
+        if(job!=JOB_NONE) break;
+        job = stealJobFromOtherThreadsLocalQueue((uint32)-1, stealIndex, priority);
+        if(job!=JOB_NONE) break;
+    }
+    if(job!=JOB_NONE) *priorityPtr = priority;
+    return job;
+}
 
-    JobControl control = instance.entry(instance.input, instance.inputSize, instance.output, instance.outputSize, &context);
-    
+static JobID tryGetHigherPriorityJob(JobPriority* currentPriority, WorkerThreadID threadId, LocalJobQueue* localQueue, JobQueue* globalQueue){
+    for (uint32 i = JOB_PRIORITY_MAX; i < *currentPriority; i++) {
+        JobID job = getJobFromGlobalQueue(globalQueue, localQueue, i, threadId);
+        if (job != JOB_NONE) {
+            *currentPriority = i;
+            return job;
+        }
+    }
+    return JOB_NONE;
+}
+
+static void prepareJob(JobID job, JobInstance* instance, struct JobData* jobData, JobBatchDescription* batch, JobContext* context, WorkerThreadID threadId){
+    getJobInstance(job, instance, jobData);
+    JobBatchID batchId = instance->batch;
+    getJobBatch(batchId, batch);
+    *context = (JobContext){0};
+    context->state = jobData->state;
+    context->stateSize = JOB_STATE_SIZE;
+    context->threadId = threadId;
+}
+
+static void updateJob(JobPriority priority, struct JobData jobData, JobContext* context){
+    context->priority = priority;
+    context->stateOffset = 0;
+    context->shouldYield = priority!=JOB_PRIORITY_MAX; // highest priority should never yield as there is nothing that could interrupt it
+    context->exec.section = jobData.context.section;
+    context->exec.subsection = jobData.context.subsection;
+}
+
+static bool32 runJob(JobID job, JobInstance instance, JobBatchDescription batch, JobContext* context, struct JobData* jobData){
+    JobControl control = batch.entry(instance.input, instance.inputSize, instance.output, instance.outputSize, context);
+    jobData->context.section = control.nextSection;
     switch(control.ret){
         default:
         case JOB_EXIT_NONE:
         case JOB_EXIT_STATE_OVERRUN:
             avFatal("error while running job");
             freeJob(job);
-            break;
+            return true;
         case JOB_EXIT_FAILURE:
             //TODO: handle success
             //avLog(AV_DEBUG_INFO, "Job exited unsuccessfully");
             freeJob(job);
-            break;
+            return true;
         case JOB_EXIT_SUCCESS:
             //TODO: handle failure
             //avLog(AV_DEBUG_SUCCESS, "Job exited successfully");
             freeJob(job);
-            break;
+            return true;
         case JOB_YIELD:
-            JobID higherPriorityJob = JOB_NONE;
-            if(threadId != 0){ // we want the main thread to stop working after each job so that it can check fences
-                for(uint32 i = JOB_PRIORITY_MAX; i < priority; i++){
-                    higherPriorityJob = getJobFromGlobalQueue(globalQueue, localQueue, i, threadId);
-                    if(higherPriorityJob!=JOB_NONE) break;
-                }
+            return false;
+    }
+}
+
+static struct JobInfo { 
+    JobID job; 
+    JobPriority priority; 
+} executeJob(JobID job, WorkerThreadID threadId, JobPriority priority, LocalJobQueue* localQueue, JobQueue* globalQueue){
+    JobInstance instance;
+    JobBatchDescription batch;
+    struct JobData jobData;
+    JobContext context;
+    prepareJob(job, &instance, &jobData, &batch, &context, threadId);
+    
+    while(true) {
+        updateJob(priority, jobData, &context);
+
+        if(runJob(job, instance, batch, &context, &jobData)) return (struct JobInfo) {.job=JOB_NONE, .priority=0};
+        JobPriority newPriority = priority;
+        JobID higherPriorityJob = tryGetHigherPriorityJob(&newPriority, threadId, localQueue, globalQueue);
+        if(higherPriorityJob!=JOB_NONE){
+            pushbackJob(job, &jobData, localQueue, priority); // we can ignore return as there is always room in the queue the job came from
+            job = higherPriorityJob;
+            priority = newPriority;
+            return (struct JobInfo){.job = job, .priority = newPriority};
+        }
+    }
+}
+
+void jobFenceWait(JobFence fence){
+    if(avThreadGetID() != AV_MAIN_THREAD_ID){
+        avError("Can only wait on fence from main thread");
+        return;
+    }
+    uint32 stealIndex = 0;
+    JobID job = JOB_NONE;
+    bool32 inProgress = false;
+    JobPriority priority = JOB_PRIORITY_MAX;
+    struct JobData jobData;
+    while(atomic_load(&fence->workLeft)!=0){
+        if(job==JOB_NONE){
+            priority = JOB_PRIORITY_MAX;
+            job = selectJobForMainThread(&stealIndex, &priority);
+            if(job==JOB_NONE){
+                avThreadYield();
+                continue;
             }
-            if(higherPriorityJob!=JOB_NONE){
-                pushbackJob(job, &jobData, localQueue, priority); // we can ignore return as there is always room in the queue the job came from
-                job = higherPriorityJob;
-                goto executeJob;
+        }else{
+            JobInstance instance;
+            JobBatchDescription batch;
+            JobContext context;
+            prepareJob(job, &instance, &jobData, &batch, &context, state->threadCount);
+            updateJob(priority, jobData, &context);
+            inProgress = true;
+            if(runJob(job, instance, batch, &context, &jobData)) {
+                job = JOB_NONE;
+                inProgress = false;
+                continue;
             }
-            jobData.context.section = control.nextSection;
-            if(control.priorityHint > priority){ // the new priority is lower than the current priority 
-                if(!pushbackJob(job, &jobData, localQueue, control.priorityHint)){
-                    localJobQueuePush(localQueue, priority, job); // there is always space in current priority queue
-                }
-            }else{
-                priority = control.priorityHint;
-                goto runJobSection;
-            }
-            break;
+        }
+    }
+    if(inProgress){
+        storeJobData(job, &jobData);
+        atomic_thread_fence(memory_order_release);
+        JobID slotJob = atomic_exchange(&state->exchange[priority], job);
+        if(slotJob != JOB_NONE){
+            avError("Exchange still contains job");
+            return;
+        }
     }
 }
 
@@ -651,8 +522,11 @@ int32 workerThreadEntry(byte* data, uint64 size){
             continue;
             //avDebug("Worker thread %u, is woken", threadId);
         }
-
-        executeJob(job, threadId, priority, localQueue, globalQueue);
+        while(job!=JOB_NONE){
+            struct JobInfo info = executeJob(job, threadId, priority, localQueue, globalQueue);
+            priority = info.priority;
+            job = info.job;
+        }
     }
     avLog(AV_DEBUG_INFO, "Worker thread %u exiting", threadId);
     return 0;
@@ -677,39 +551,56 @@ void jobFenceDestroy(JobFence fence){
     }
     avFree(fence);
 }
-void jobFenceWait(JobFence fence){
-    if(avThreadGetID() != AV_MAIN_THREAD_ID){
-        avError("Can only wait on fence from main thread");
-        return;
-    }
-    while(atomic_load(&fence->workLeft)!=0){
 
-        //Do usefull work
-
-    }
-}
 static void attachWorkToFence(JobFence fence){
     atomic_fetch_add(&fence->workLeft, 1);
 }
 
-bool32 submitJobBatch(JobBatchDescription* batch, JobFence fence){
+JobBatchID submitJobBatch(JobBatchDescription* batch, JobFence fence){
     if(fence != NULL){
         if(avThreadGetID() != AV_MAIN_THREAD_ID){
             avError("Tried to submit job batch with fence from worker thread");
-            return false;
+            return JOB_BATCH_NONE;
         }
         batch->fence = fence;
         attachWorkToFence(fence);
     }
-    JobBatchID id = allocateJobBatch(batch);
+    JobBatchID id = allocateJobBatch(batch, NULL, NULL);
     if(id == JOB_BATCH_NONE) {
         avError("Failed to allocate job batch");
-        return false;
+        return JOB_BATCH_NONE;
     }
-    if(!jobQueuePush(&state->jobQueue, batch->priority, id)){
+    attachWorkToFence(&state->allWorkDoneFence);
+    return submitToMainQueue(batch->priority, id);
+}
+
+JobBatchID submitToMainQueue(JobPriority priority, JobBatchID id){
+    if(!jobQueuePush(&state->jobQueue, priority, id)){
         avError("Failed to submit job to queue");
-        return false;
+        atomic_fetch_sub(&state->allWorkDoneFence.workLeft, 1);
+        return JOB_BATCH_NONE;
     }
     avSemaphorePost(state->workPresent);
-    return true;
+    return id;
+}
+
+JobBatchID submitJobBatchWithDependencies(JobBatchDescription* batch, uint32 dependencyCount, JobBatchID* dependencies, JobFence fence){
+    if(fence != NULL){
+        if(avThreadGetID() != AV_MAIN_THREAD_ID){
+            avError("Tried to submit job batch with fence from worker thread");
+            return JOB_BATCH_NONE;
+        }
+        batch->fence = fence;
+        attachWorkToFence(fence);
+    }
+    attachWorkToFence(&state->allWorkDoneFence);
+    JobBatchID id = allocateJobBatch(batch, dependencyCount, dependencies);
+    if(id == JOB_BATCH_NONE){
+        avError("Failed to allocate job batch");
+        return JOB_BATCH_NONE;
+    }
+
+    return id; // No need to do anything else as allocate jobBatch handles submission to the global queue
+    //attachWorkToFence(&state->allWorkDoneFence);
+    
 }

@@ -52,7 +52,7 @@ typedef struct RendererState {
     uint32 graphicsQueueFamily;
 } RendererState;
 
-struct RendererState* state;
+static struct RendererState* state;
 
 
 
