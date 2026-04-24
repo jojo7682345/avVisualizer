@@ -36,15 +36,15 @@ struct FreeListHead {
 struct JobBatchPool {
     _Atomic struct FreeListHead head;
     _Atomic uint32 activeJobBatchCount;
-    struct JobBatchPoolSlot slots[JOB_INSTANCE_POOL_SIZE];
+    struct JobBatchPoolSlot slots[JOB_BATCH_POOL_SIZE];
 };
 static struct JobBatchPool jobBatchPool = {0};
 
 void jobBatchPoolInit(){
-    for (uint32 i = 0; i < JOB_INSTANCE_POOL_SIZE - 1; i++) {
+    for (uint32 i = 0; i < JOB_BATCH_POOL_SIZE - 1; i++) {
         atomic_store(&jobBatchPool.slots[i].nextFree, i + 1);
     }
-    atomic_store(&jobBatchPool.slots[JOB_INSTANCE_POOL_SIZE - 1].nextFree, __UINT32_MAX__);
+    atomic_store(&jobBatchPool.slots[JOB_BATCH_POOL_SIZE - 1].nextFree, __UINT32_MAX__);
     struct FreeListHead head = (struct FreeListHead){ .index = 0, .tag = 0 };
     atomic_store(&jobBatchPool.head, head);
 #ifndef NDEBUG // reserve id 0 for debugging, and throw an error when this id is used.

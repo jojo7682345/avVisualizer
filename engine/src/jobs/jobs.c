@@ -599,8 +599,5 @@ JobBatchID submitJobBatchWithDependencies(JobBatchDescription* batch, uint32 dep
         avError("Failed to allocate job batch");
         return JOB_BATCH_NONE;
     }
-
     return id; // No need to do anything else as allocate jobBatch handles submission to the global queue
-    //attachWorkToFence(&state->allWorkDoneFence);
-    
 }
