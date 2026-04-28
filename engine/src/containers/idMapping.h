@@ -14,5 +14,5 @@ void* idMappingGet(void** mapping, uint32 id);
 #define MAPPING_ADD(ptr, data) idMappingAdd((void**)&(ptr), &(data))
 #define MAPPING_INSERT(ptr, id, data) idMappingInsert((void**)&(ptr), (id), &(data))
 #define MAPPING_REMOVE(ptr, id) idMappingRemove((void**)&(ptr), (id))
-#define MAPPING_GET(ptr, id) ((typeof((ptr)[0])*)idMappingGet(&(ptr), (id)))
+#define MAPPING_GET(ptr, id) ((typeof((ptr)[0])*)idMappingGet((void**)&(ptr), (id)))
 #define MAPPING_SIZE(ptr) idMappingCount((void**)&(ptr))

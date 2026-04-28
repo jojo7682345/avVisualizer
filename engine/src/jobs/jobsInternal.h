@@ -25,6 +25,7 @@ typedef struct JobInstance {
     byte* output;
     uint32 inputSize;
     uint32 outputSize;
+    uint32 index;
     //JobPriority priority;
     //JobPriority effectivePriority; // priority inheritance
     //JobEntry entry; // take this from the batchId
@@ -73,6 +74,11 @@ typedef struct JobSystemState {
     _Atomic uint32 activeThreads;
     _Atomic JobID exchange[JOB_PRIORITY_COUNT];
     struct JobFence allWorkDoneFence;
+    struct JobFence frameFence; 
+
+    JobBatchID resultBuffer[JOB_RESULT_BUFFER_SIZE];
+    _Atomic uint32 resultBufferIndex;
+    AvRwLock resultLock;
 } JobSystemState;
 
 
@@ -81,3 +87,5 @@ typedef struct JobSystemState {
 extern JobSystemState* state;
 
 JobBatchID submitToMainQueue(JobPriority priority, JobBatchID id);
+
+void processBatchCompletion(JobBatchID batch);

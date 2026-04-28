@@ -956,16 +956,16 @@ void stagingBufferDestroy(Scene scene, AvThreadID threadId){
     avAllocatorDestroy(&scene->stagingBuffers[threadId].componentAllocator);
     avAllocatorDestroy(&scene->stagingBuffers[threadId].componentHandleAllocator);
     darrayDestroy(scene->stagingBuffers[threadId].entities);
-    scene->stagingBuffers[threadId].threadID = AV_MAIN_THREAD_ID;
+    MAPPING_REMOVE(scene->stagingBuffers, threadId);
 }
 
 StagingBufferHandle getStagingBuffer(Scene scene, AvThreadID threadId){
     if(scene==NULL || threadId >= AV_MAX_THREADS) return NULL;
-    if(scene->stagingBuffers[threadId].threadID==AV_MAIN_THREAD_ID){
+    if(MAPPING_GET(scene->stagingBuffers, threadId)->threadID==AV_MAIN_THREAD_ID){
         stagingBufferCreate(scene, threadId);
-        return scene->stagingBuffers + threadId;
+        return MAPPING_GET(scene->stagingBuffers, threadId);
     }else{
-        return scene->stagingBuffers + threadId;
+        return MAPPING_GET(scene->stagingBuffers, threadId);
     }
 }
 
@@ -1131,6 +1131,6 @@ void sceneApply(Scene scene){
     if(threadId != AV_MAIN_THREAD_ID) return;
 
     for(uint32 i = 0; i < MAPPING_SIZE(scene->stagingBuffers); i++){
-        if(scene->stagingBuffers[i].threadID==AV_MAIN_THREAD_ID)continue;
+        //if(scene->stagingBuffers[i].threadID==AV_MAIN_THREAD_ID)continue; 
     }
 }

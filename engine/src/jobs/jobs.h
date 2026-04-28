@@ -36,14 +36,15 @@ typedef struct JobContext {
     uint32 stateOffset;
     uint32 stateSize;
     WorkerThreadID threadId;
+    uint32 index;
+    JobBatchID batch;
 } JobContext;
 
 typedef enum JobControlReturn {
-    JOB_EXIT_NONE,
-    JOB_EXIT_SUCCESS,
-    JOB_EXIT_FAILURE,
+    JOB_ERROR,
+    JOB_EXIT,
     JOB_YIELD,
-    JOB_EXIT_STATE_OVERRUN,
+    JOB_STATE_OVERRUN,
 } JobControlReturn;
 
 typedef struct JobControl {
@@ -53,21 +54,27 @@ typedef struct JobControl {
 
 // Job control
 typedef JobControl (*JobEntry)(byte* input, uint32 inputSize, byte* output, uint32 outputSize, JobContext* context);
-typedef void (*JobResultCallback)(byte* output, uint32 outputSize, JobContext* context);
+typedef void (*JobBatchCallback)(byte* input, uint32 inputSize, byte* output, uint32 outputStride);
 
 typedef struct JobFence* JobFence;
 
+typedef struct JobBatchFlags {
+    JobPriority priority : 3;
+    bool32 completeThisFrame : 1;
+}JobBatchFlags;
+
 typedef struct JobBatchDescription {
-    uint32 size;
-    JobPriority priority;
-    byte* inputData;
+    uint16 size;
+    uint16 index;
+    JobBatchFlags flags;
     uint32 inputStride;
-    byte* outputData;
+    uint32 inputOffset;
     uint32 outputStride;
-    uint32 stateSize;
+    uint32 outputOffset;
+    byte* inputData;
+    byte* outputData;
     JobEntry entry;
-    JobResultCallback onSuccess;
-    JobResultCallback onFailure;
+    JobBatchCallback onComplete;
     JobFence fence;
 } JobBatchDescription;
 
@@ -77,17 +84,17 @@ typedef struct JobSystemConfig {
 
 #define JOB_MAX_DEPENDENTS 8
 #define JOB_STATE_SIZE 4096
+#define JOB_RESULT_BUFFER_SIZE 1024
 
-#define JOB_START JobControl __job_control = {.ret=JOB_EXIT_NONE, }; switch(context->exec.section){ case 0:{
+#define JOB_START JobControl __job_control = {.ret=JOB_ERROR, }; switch(context->exec.section){ case 0:{
 
 #define JOB_SECTION(sectionNum) if(atomic_load_explicit(&context->shouldYield, memory_order_relaxed)) {__job_control.ret = JOB_YIELD;  __job_control.nextSection=context->exec.section+1; break;} } case (sectionNum):{
 
-#define JOB_END break; } default: __job_control.ret = JOB_EXIT_SUCCESS; break; } return __job_control;
+#define JOB_END break; } default: __job_control.ret = JOB_EXIT; break; } return __job_control;
 
-#define JOB_EXIT_SUCCESS() do{ return (JobControl){.ret=JOB_EXIT_SUCCESS}; } while(0)
-#define JOB_EXIT_FAILURE() do{ return (JobControl){.ret=JOB_EXIT_SUCCESS}; } while(0)
+#define JOB_EXIT() do{ return (JobControl){.ret=JOB_EXIT}; } while(0)
 
-//#define JOB_LOCAL(type, name) type* name = (type*)context->state; context->state += sizeof(type); context->stateSize -= sizeof(type); if(context->state + sizeof(type) > context->stateSize) {return (JobControl){.ret=JOB_EXIT_STATE_OVERRUN}; }
+//#define JOB_LOCAL(type, name) type* name = (type*)context->state; context->state += sizeof(type); context->stateSize -= sizeof(type); if(context->state + sizeof(type) > context->stateSize) {return (JobControl){.ret=JOB_STATE_OVERRUN}; }
 
 #define JOB_LOCAL(type, name) \
     type* name = NULL; \
@@ -95,7 +102,7 @@ typedef struct JobSystemConfig {
         uint32 align = _Alignof(type);\
         uint32 offset = (context->stateOffset + (align - 1)) & ~(align - 1); \
         if(offset + sizeof(type) > context->stateSize) {\
-            return (JobControl){.ret = JOB_EXIT_STATE_OVERRUN}; \
+            return (JobControl){.ret = JOB_STATE_OVERRUN}; \
         } \
         name = (type*)(context->exec.state + offset); \
         context->exec.stateOffset = offset + sizeof(type); \
@@ -117,17 +124,17 @@ typedef struct JobSystemConfig {
             }else
 
 
-bool32 jobSystemInitialize(uint64* memoryRequirement, void* statePtr, void* configPtr);
-void jobSystemDeinitialize(void* statePtr);
+AV_API bool32 jobSystemInitialize(uint64* memoryRequirement, void* statePtr, void* configPtr);
+AV_API void jobSystemDeinitialize(void* statePtr);
 
-void jobFenceCreate(JobFence* fence);
-void jobFenceDestroy(JobFence fence);
-void jobFenceWait(JobFence fence);
+AV_API void jobFenceCreate(JobFence* fence);
+AV_API void jobFenceDestroy(JobFence fence);
+AV_API void jobFenceWait(JobFence fence);
 
-JobBatchID submitJobBatch(JobBatchDescription* batch, JobFence fence);
-JobBatchID submitJobBatchWithDependencies(JobBatchDescription* batch, uint32 dependencyCount, JobBatchID* dependencies, JobFence fence);
-JobBatchID submitJobBatchAfter(JobBatchDescription* batch, uint32 ms, JobFence fence);
-JobBatchID submitJobBatchAfterWithDependencies(JobBatchDescription* batch, uint32 dependencyCount, JobBatchID* dependencies, uint32 ms, JobFence fence);
+AV_API JobBatchID submitJobBatch(JobBatchDescription* batch, JobFence fence);
+AV_API JobBatchID submitJobBatchWithDependencies(JobBatchDescription* batch, uint32 dependencyCount, JobBatchID* dependencies, JobFence fence);
+
+AV_API void jobSystemUpdate();
 
 // JobControl exampleJob(byte* input, uint32 inputSize, byte* output, uint32 outputSize, JobContext context){
 //     JOB_LOCAL(uint32, a);

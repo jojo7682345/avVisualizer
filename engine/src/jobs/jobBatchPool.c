@@ -131,6 +131,7 @@ JobBatchID allocateJobBatch(JobBatchDescription* description, uint32 depdendency
     uint32 generation = atomic_load_explicit(&slot->generation, memory_order_relaxed);
 
     avMemcpy(&slot->batch, description, sizeof(JobBatchDescription));
+    description->index = 0;
 
     atomic_store_explicit(&slot->remainingJobs, description->size, memory_order_relaxed);
     atomic_store_explicit(&slot->dependencyCount, 0, memory_order_relaxed);
@@ -154,7 +155,7 @@ JobBatchID allocateJobBatch(JobBatchDescription* description, uint32 depdendency
             }
         }
         if(atomic_fetch_sub_explicit(&slot->dependencyCount, 1, memory_order_acq_rel)==1){
-            if(submitToMainQueue(slot->batch.priority, id.id)==JOB_BATCH_NONE){
+            if(submitToMainQueue(slot->batch.flags.priority, id.id)==JOB_BATCH_NONE){
                 avError("Failed to submit job to main queue");
                 return JOB_BATCH_NONE;
             }
@@ -213,7 +214,7 @@ static void dropHandle(struct JobBatchPoolSlot* slot){
     for(uint32 i = 0; i < dependentCount; i++){
         struct JobBatchPoolSlot* depSlot = getSlot(slot->dependents[i]);
         if(atomic_fetch_sub_explicit(&depSlot->dependencyCount, 1, memory_order_acq_rel)==1){
-            if(submitToMainQueue(depSlot->batch.priority, slot->dependents[i])==JOB_BATCH_NONE){
+            if(submitToMainQueue(depSlot->batch.flags.priority, slot->dependents[i])==JOB_BATCH_NONE){
                 avError("Failed to submit job to main queue");
             }
         }

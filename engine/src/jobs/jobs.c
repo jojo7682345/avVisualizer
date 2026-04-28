@@ -9,7 +9,7 @@ JobInstancePool jobInstancePool = {0};
 JobSystemState* state = NULL;
 
 int32 workerThreadEntry(byte* data, uint64 size);
-bool32 jobSystemInitialize(uint64* memoryRequirement, void* statePtr, void* configPtr){
+AV_API bool32 jobSystemInitialize(uint64* memoryRequirement, void* statePtr, void* configPtr){
     *memoryRequirement = sizeof(JobSystemState);
     if(statePtr==NULL) return true;
     state = (JobSystemState*) statePtr;
@@ -69,7 +69,7 @@ void finishAndExit(){
     }
 }
 
-void jobSystemDeinitialize(void* statePtr){
+AV_API void jobSystemDeinitialize(void* statePtr){
     if(state==NULL) return;
 
     finishAndExit();
@@ -159,8 +159,9 @@ void freeJob(JobID job){
 signalComplete:
     if(signalJobComplete(batch)){
         // all work from batch is completed
-        freeJobBatch(batch);
-        atomic_fetch_sub(&state->allWorkDoneFence.workLeft, 1);
+        
+        processBatchCompletion(batch);
+        
     }
 }
 
@@ -188,29 +189,26 @@ struct batchSplit{uint32 count; uint32 remainingCount; } splitJobBatch(JobID* jo
     JobBatchDescription jobBatch;
     getJobBatch(batch, &jobBatch);
 
-    uint32 jobsToConsume = AV_MIN(maxJobs, jobBatch.size);
-    for(uint32 i = 0; i < jobsToConsume; i++){
+    uint32 remainingJobs = jobBatch.size - jobBatch.index;
+    uint32 jobsToConsume = AV_MIN(maxJobs, remainingJobs);
+    for(uint32 j = 0; j < jobsToConsume; j++){
+        uint32 i = jobBatch.index + j;
         JobInstance jobBuffer;
-        //jobBuffer.entry = jobBatch.entry;
-        jobBuffer.input = jobBatch.inputData + jobBatch.inputStride * i;
-        jobBuffer.output = jobBatch.outputData + jobBatch.outputStride * i;
+        jobBuffer.input = jobBatch.inputData + jobBatch.inputOffset + jobBatch.inputStride * i;
+        jobBuffer.output = jobBatch.outputData + jobBatch.outputOffset + jobBatch.outputStride * i;
         jobBuffer.inputSize = jobBatch.inputStride;
         jobBuffer.outputSize = jobBatch.outputStride;
-        //jobBuffer.onFailure = jobBatch.onFailure;
-        //jobBuffer.onSuccess = jobBatch.onSuccess;
-        //jobBuffer.priority = jobBatch.priority;
         jobBuffer.batch = batch;
-        jobs[i] = allocateJob(&jobBuffer);
+        jobBuffer.index = i;
+        jobs[j] = allocateJob(&jobBuffer);
     }
-    jobBatch.inputData += jobBatch.inputStride * jobsToConsume;
-    jobBatch.outputData += jobBatch.outputStride * jobsToConsume;
-    jobBatch.size -= jobsToConsume;
-    if(jobBatch.size==0){
+    jobBatch.index += jobsToConsume;
+    if(jobBatch.size==jobBatch.index){
         return (struct batchSplit) {.count=jobsToConsume, .remainingCount = 0};
     }
 
     writeJobBatch(batch, &jobBatch);
-    return (struct batchSplit) {.count=jobsToConsume, .remainingCount = jobBatch.size};
+    return (struct batchSplit) {.count=jobsToConsume, .remainingCount = jobBatch.size - jobBatch.index};
 }
 
 static void wakeAdditionalWorkers(uint32 availableJobs){
@@ -399,6 +397,8 @@ static void prepareJob(JobID job, JobInstance* instance, struct JobData* jobData
     context->state = jobData->state;
     context->stateSize = JOB_STATE_SIZE;
     context->threadId = threadId;
+    context->batch = batchId;
+    context->index = instance->index;
 }
 
 static void updateJob(JobPriority priority, struct JobData jobData, JobContext* context){
@@ -414,18 +414,12 @@ static bool32 runJob(JobID job, JobInstance instance, JobBatchDescription batch,
     jobData->context.section = control.nextSection;
     switch(control.ret){
         default:
-        case JOB_EXIT_NONE:
-        case JOB_EXIT_STATE_OVERRUN:
+        case JOB_ERROR:
+        case JOB_STATE_OVERRUN:
             avFatal("error while running job");
             freeJob(job);
             return true;
-        case JOB_EXIT_FAILURE:
-            //TODO: handle success
-            //avLog(AV_DEBUG_INFO, "Job exited unsuccessfully");
-            freeJob(job);
-            return true;
-        case JOB_EXIT_SUCCESS:
-            //TODO: handle failure
+        case JOB_EXIT:
             //avLog(AV_DEBUG_SUCCESS, "Job exited successfully");
             freeJob(job);
             return true;
@@ -459,7 +453,7 @@ static struct JobInfo {
     }
 }
 
-void jobFenceWait(JobFence fence){
+AV_API void jobFenceWait(JobFence fence){
     if(avThreadGetID() != AV_MAIN_THREAD_ID){
         avError("Can only wait on fence from main thread");
         return;
@@ -532,7 +526,7 @@ int32 workerThreadEntry(byte* data, uint64 size){
     return 0;
 }
 
-void jobFenceCreate(JobFence* fence){
+AV_API void jobFenceCreate(JobFence* fence){
     if(avThreadGetID() != AV_MAIN_THREAD_ID){
         avError("Can only create fence from main thread");
         return;
@@ -541,7 +535,7 @@ void jobFenceCreate(JobFence* fence){
     avMemset(*fence, 0, sizeof(struct JobFence));
     atomic_store(&(*fence)->workLeft, 0); 
 }
-void jobFenceDestroy(JobFence fence){
+AV_API void jobFenceDestroy(JobFence fence){
     if(avThreadGetID() != AV_MAIN_THREAD_ID){
         avError("Can only destroy fence from main thread");
         return;
@@ -556,7 +550,7 @@ static void attachWorkToFence(JobFence fence){
     atomic_fetch_add(&fence->workLeft, 1);
 }
 
-JobBatchID submitJobBatch(JobBatchDescription* batch, JobFence fence){
+AV_API JobBatchID submitJobBatch(JobBatchDescription* batch, JobFence fence){
     if(fence != NULL){
         if(avThreadGetID() != AV_MAIN_THREAD_ID){
             avError("Tried to submit job batch with fence from worker thread");
@@ -571,7 +565,10 @@ JobBatchID submitJobBatch(JobBatchDescription* batch, JobFence fence){
         return JOB_BATCH_NONE;
     }
     attachWorkToFence(&state->allWorkDoneFence);
-    return submitToMainQueue(batch->priority, id);
+    if(batch->flags.completeThisFrame){
+        attachWorkToFence(&state->frameFence);
+    }
+    return submitToMainQueue(batch->flags.priority, id);
 }
 
 JobBatchID submitToMainQueue(JobPriority priority, JobBatchID id){
@@ -584,7 +581,7 @@ JobBatchID submitToMainQueue(JobPriority priority, JobBatchID id){
     return id;
 }
 
-JobBatchID submitJobBatchWithDependencies(JobBatchDescription* batch, uint32 dependencyCount, JobBatchID* dependencies, JobFence fence){
+AV_API JobBatchID submitJobBatchWithDependencies(JobBatchDescription* batch, uint32 dependencyCount, JobBatchID* dependencies, JobFence fence){
     if(fence != NULL){
         if(avThreadGetID() != AV_MAIN_THREAD_ID){
             avError("Tried to submit job batch with fence from worker thread");
@@ -600,4 +597,61 @@ JobBatchID submitJobBatchWithDependencies(JobBatchDescription* batch, uint32 dep
         return JOB_BATCH_NONE;
     }
     return id; // No need to do anything else as allocate jobBatch handles submission to the global queue
+}
+
+void processBatchCompletion(JobBatchID id){
+    JobBatchDescription batch;
+    getJobBatch(id, &batch);
+
+    if(batch.onComplete){
+        avRWLockReadLock(state->resultLock);
+
+        uint32 index = atomic_fetch_add_explicit(&state->resultBufferIndex, 1, memory_order_acq_rel);
+        if(index >= JOB_RESULT_BUFFER_SIZE){
+            avFatal("Job result buffer overrun");
+            avRWLockReadUnlock(state->resultLock);
+            goto doFreeJob;
+        }
+
+        state->resultBuffer[index] = id;
+
+        avRWLockReadUnlock(state->resultLock);
+        return;
+    }else{
+        doFreeJob:
+        freeJobBatch(id);
+        atomic_fetch_sub(&state->allWorkDoneFence.workLeft, 1);
+    }
+}
+
+void processResults(){
+    avRWLockWriteLock(state->resultLock);
+    atomic_thread_fence(memory_order_acquire);
+
+    for(uint32 i = 0; i < state->resultBufferIndex; i++){
+        JobBatchDescription batch;
+        JobBatchID id = state->resultBuffer[i];
+        getJobBatch(id, &batch);
+        if(!batch.onComplete){
+            avError("logic error");
+            continue;
+        }
+        batch.onComplete(batch.inputData, batch.inputStride, batch.outputData, batch.outputStride);
+        freeJobBatch(id);
+        atomic_fetch_sub(&state->allWorkDoneFence.workLeft, 1);
+    }
+    state->resultBufferIndex = 0;
+    atomic_thread_fence(memory_order_release);
+    avRWLockWriteUnlock(state->resultLock);
+
+}
+
+AV_API void jobSystemUpdate(){
+    if(avThreadGetID()!=AV_MAIN_THREAD_ID) {
+        avError("Can only process results on main thread");
+        return;
+    };
+
+    jobFenceWait(&state->frameFence);
+    processResults();
 }

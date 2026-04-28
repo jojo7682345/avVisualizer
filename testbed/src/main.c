@@ -48,7 +48,7 @@ JobControl exampleJob(byte* input, uint32 inputSize, byte* output, uint32 output
     avThreadSleep(10);
     completedWork[context->threadId]++;
     //avDebug("Thread %u completed %u jobs", context->threadId, completedWork[context->threadId]);
-    JOB_EXIT_SUCCESS();
+    JOB_EXIT();
 }
 
 
@@ -106,7 +106,7 @@ bool8 initialize(struct Application* app){
     JobBatchDescription batch = {
         .size = 4096,
         .entry = exampleJob,
-        .priority = JOB_PRIORITY_MAX,
+        .flags.priority = JOB_PRIORITY_MAX,
     };
     JobBatchID id = submitJobBatch(&batch, fence);
     //wait untill id is already completed;
