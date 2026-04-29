@@ -44,6 +44,7 @@ AV_API ComponentMask componentMaskAnd(ComponentMask maskA, ComponentMask maskB);
 AV_API ComponentMask componentMaskOr(ComponentMask maskA, ComponentMask maskB);
 AV_API ComponentMask componentMaskInvert(ComponentMask mask);
 AV_API uint32 componentMaskCount(ComponentMask mask);
+AV_API bool32 componentMaskIsEmpty(ComponentMask mask);
 
 typedef struct Scene* Scene;
 typedef void* ComponentData;
@@ -51,7 +52,7 @@ typedef struct ComponentInfo {
     ComponentType type;
     struct ComponentInfo* next;
 } ComponentInfo;
-typedef void (*ComponentConstructor)(Scene scene, Entity entity, ComponentData data, uint32 size, ComponentInfo* info);
+typedef void (*ComponentConstructor)(Scene scene, Entity entity, ComponentData data, uint32 size, byte* constructorData, uint32 constructorDataSize);
 typedef void (*ComponentDestructor)(Scene scene, Entity entity, ComponentData data, uint32 size);
 
 AV_API bool32 registerComponent(ComponentType* component, uint32 size, ComponentConstructor constructor, ComponentDestructor destructor);

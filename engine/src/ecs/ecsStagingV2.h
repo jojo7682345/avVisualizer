@@ -3,17 +3,13 @@
 #include "ecsInternal.h"
 
 typedef enum CommandType {
-    CMD_ENTITY_CREATE,
-    CMD_ENTITY_DESTROY,
     CMD_COMPONENT_ADD,
     CMD_COMPONENT_REMOVE,
+    CMD_ENTITY_DESTROY,
 } CommandType;
 
 typedef struct Command {
-    CommandType type;
-
     Entity entityId;
-    ComponentType componentId;
 
     uint32 dataOffset;
     uint32 dataSize;
@@ -30,17 +26,20 @@ typedef struct CommandList {
 
 typedef struct CommandBucket {
     CommandList commands[MAX_COMPONENT_COUNT]; //darray's
+    ComponentMask mask;
 } CommandBucket;
 
 #define MAX_SIZE_CLASSES 32
 
-typedef struct FreeNode {
-    uint32 next;
-} FreeNode;
+#define FAST_CLASS_COUNT 4
+#define FAST_CACHE_SIZE 8
+typedef struct FastCache {
+    uint32 offsets[FAST_CACHE_SIZE];
+    uint32 count;
+} FastCache;
 
 typedef struct CommandBuffer {
-    CommandBucket createCommands; // darray
-    CommandBucket destroyCommands;
+    CommandList destroyCommands;
     CommandBucket removeCommands;
     CommandBucket addCommands;
 
@@ -49,10 +48,9 @@ typedef struct CommandBuffer {
     uint32 dataBlobCapacity;
 
     Command* commandMem;
-    uint32 commandSize;
     uint32 commandCapacity; // stored as log2(capacity)
-
     uint32 freeList[MAX_SIZE_CLASSES];
+    FastCache fastCache[FAST_CLASS_COUNT];
 } CommandBuffer; // command buffer per frame
 
 void commandBufferCreate(CommandBuffer* buffer);

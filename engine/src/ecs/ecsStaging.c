@@ -40,7 +40,8 @@ static void stagedEntityAddStagedComponent(Scene scene, StagingBuffer* buffer, E
     component->data.entity = entity;
     component->data.type = type;
     
-    if(constructor) constructor(scene, entity, component->data.data, size, info);
+    // TODO: remove this is deprecated
+    //if(constructor) constructor(scene, entity, component->data.data, size, info);
 
     struct StagedComponentList* list =  sEntity->components;
     if(list==NULL) sEntity->components = component;

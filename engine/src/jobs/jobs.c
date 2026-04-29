@@ -499,6 +499,7 @@ AV_API void jobFenceWait(JobFence fence){
 int32 workerThreadEntry(byte* data, uint64 size){
     WorkerThreadID threadId = (WorkerThreadID) size;
     WorkerThread* thread = &state->threads[threadId];
+    thread->id = avThreadGetID();
     LocalJobQueue* localQueue = &thread->localQueue;
     JobQueue* globalQueue = &state->jobQueue;
     uint32 stealIndex = (threadId+1) % state->threadCount;
@@ -654,4 +655,16 @@ AV_API void jobSystemUpdate(){
 
     jobFenceWait(&state->frameFence);
     processResults();
+}
+
+AV_API uint32 jobSystemGetWorkerCount(){
+    return state->threadCount;
+}
+AV_API void jobSystemQuerryWorkerThreads(uint32* threadCount, AvThreadID* threadIds){
+    if(!state) return;
+    *threadCount = jobSystemGetWorkerCount();
+    if(threadIds==NULL) return;
+    for(uint32 i = 0; i < *threadCount; i++){
+        threadIds[i] = state->threads[i].id;
+    }
 }

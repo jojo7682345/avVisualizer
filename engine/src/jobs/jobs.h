@@ -136,6 +136,9 @@ AV_API JobBatchID submitJobBatchWithDependencies(JobBatchDescription* batch, uin
 
 AV_API void jobSystemUpdate();
 
+AV_API uint32 jobSystemGetWorkerCount();
+AV_API void jobSystemQuerryWorkerThreads(uint32* threadCount, uint16* threadIds);
+
 // JobControl exampleJob(byte* input, uint32 inputSize, byte* output, uint32 outputSize, JobContext context){
 //     JOB_LOCAL(uint32, a);
 //     // code that runs always

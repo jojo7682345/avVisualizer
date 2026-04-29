@@ -21,7 +21,7 @@ typedef struct BarComponent {
     uint32 b;
 } BarComponent;
 
-void fooConstructor(Scene scene, Entity entity, void* component, uint32 size,  ComponentInfo* info){
+void fooConstructor(Scene scene, Entity entity, void* component, uint32 size, byte* data, uint32 dataSize){
     ((FooComponent*)component)->a = 2;
     //avLog(AV_DEBUG, "Initialized foo component of entity %x, with %u", entity, ((FooComponent*)component)->a);
 }
@@ -29,7 +29,7 @@ void fooDestructor(Scene scene, Entity entity, void* component, uint32 size){
     //avLog(AV_DEBUG, "Uninitialized foo component of entity %x, with %u", entity, ((FooComponent*)component)->a);
 }
 
-void barConstructor(Scene scene, Entity entity, void* component, uint32 size, ComponentInfo* info){
+void barConstructor(Scene scene, Entity entity, void* component, uint32 size, byte* data, uint32 dataSize){
     ((BarComponent*)component)->a = 2;
     ((BarComponent*)component)->b = 3;
     //avLog(AV_DEBUG, "Initialized bar component of entity %x, with %u %u", entity, ((BarComponent*)component)->a, ((BarComponent*)component)->b);

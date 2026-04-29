@@ -157,6 +157,13 @@ AV_API uint32 componentMaskCount(ComponentMask mask){
     return count;
 }
 
+AV_API bool32 componentMaskIsEmpty(ComponentMask mask){
+    for(uint32 i = 0; i < COMPONENT_MASK_SIZE; i++){
+        if(mask.bits[i]) return false;
+    }
+    return true;
+}
+
 static ChunkPool chunkPool;
 static void initChunkPool(){
     chunkPool.chunkCount = 0;

@@ -19,6 +19,7 @@ typedef struct ComponentEntry {
 typedef struct ComponentRegistry {
 	ComponentMask registeredComponents;
 	ComponentEntry entries[COMPONENT_REGISTRY_SIZE];
+    uint32 maxSize;
 } ComponentRegistry;
 
 typedef ComponentData Component;
@@ -119,6 +120,8 @@ struct Scene {
 uint32 getComponentSize(ComponentType component);
 ComponentConstructor getComponentConstructor(ComponentType component);
 ComponentDestructor getComponentDestructor(ComponentType component);
+uint32 getMaxComponentSize();
+
 
 Entity allocateEntityID(Scene scene, LocalEntity value, bool8 staged);
 void freeEntityID(Scene scene, Entity entity);
