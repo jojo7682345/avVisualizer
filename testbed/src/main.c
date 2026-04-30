@@ -23,19 +23,19 @@ typedef struct BarComponent {
 
 void fooConstructor(Scene scene, Entity entity, void* component, uint32 size, byte* data, uint32 dataSize){
     ((FooComponent*)component)->a = 2;
-    //avLog(AV_DEBUG, "Initialized foo component of entity %x, with %u", entity, ((FooComponent*)component)->a);
+    avLog(AV_DEBUG, "Initialized foo component of entity %x, with %u", entity, ((FooComponent*)component)->a);
 }
 void fooDestructor(Scene scene, Entity entity, void* component, uint32 size){
-    //avLog(AV_DEBUG, "Uninitialized foo component of entity %x, with %u", entity, ((FooComponent*)component)->a);
+    avLog(AV_DEBUG, "Uninitialized foo component of entity %x, with %u", entity, ((FooComponent*)component)->a);
 }
 
 void barConstructor(Scene scene, Entity entity, void* component, uint32 size, byte* data, uint32 dataSize){
     ((BarComponent*)component)->a = 2;
     ((BarComponent*)component)->b = 3;
-    //avLog(AV_DEBUG, "Initialized bar component of entity %x, with %u %u", entity, ((BarComponent*)component)->a, ((BarComponent*)component)->b);
+    avLog(AV_DEBUG, "Initialized bar component of entity %x, with %u %u", entity, ((BarComponent*)component)->a, ((BarComponent*)component)->b);
 }
 void barDestructor(Scene scene, Entity entity, void* component, uint32 size){
-    //avLog(AV_DEBUG, "Uninitialized bar component of entity %x, with %u %u", entity, ((BarComponent*)component)->a, ((BarComponent*)component)->b);
+    avLog(AV_DEBUG, "Uninitialized bar component of entity %x, with %u %u", entity, ((BarComponent*)component)->a, ((BarComponent*)component)->b);
 }
 
 volatile uint32 completedWork[12] = {0, 0};
@@ -55,50 +55,26 @@ JobControl exampleJob(byte* input, uint32 inputSize, byte* output, uint32 output
 bool8 initialize(struct Application* app){
     initializeCpp(app);
 
+    // initialize
     scene = sceneCreate();
     registerComponent(&COMPONENT_TYPE_FOO, sizeof(FooComponent), fooConstructor, fooDestructor);
     registerComponent(&COMPONENT_TYPE_BAR, sizeof(BarComponent), barConstructor, barDestructor);
     registerComponent(&COMPONENT_TYPE_BAZ, 0, NULL, NULL);
 
-    ComponentInfo bazInfo = {
-        .type = COMPONENT_TYPE_BAZ,
-        .next = NULL,
-    };
-    ComponentInfo barInfo = {
-        .type = COMPONENT_TYPE_BAR,
-        .next = &bazInfo,
-    };
-    ComponentInfo fooInfo = {
-        .type = COMPONENT_TYPE_FOO,
-        .next = &barInfo,
-    };
+    Entity foo = entityCreate(scene);
+    Entity bar = entityCreate(scene);
 
-    ComponentInfo singleFoo = {
-        .type = COMPONENT_TYPE_FOO,
-        .next = NULL,
-    };
+    entityAddComponent(scene, foo, COMPONENT_TYPE_FOO, NULL, 0);
+    entityAddComponent(scene, bar, COMPONENT_TYPE_BAR, NULL, 0);
 
-    Entity foo = entityCreate(scene, &fooInfo);
-    Entity bar = entityCreate(scene, &fooInfo);
-    Entity baz = entityCreate(scene, &fooInfo);
-
-    Entity a = entityCreate(scene, &barInfo);
-
-    entityDestroy(scene, foo);
-
-    foo = entityCreate(scene, &fooInfo);
-
-    entityAddComponent(scene, a, &singleFoo);
-    entityAddComponent(scene, a, &singleFoo);
-    entityAddComponent(scene, a, &singleFoo);
-    entityAddComponent(scene, a, &singleFoo);
-    
-    entityRemoveComponent(scene, a, COMPONENT_TYPE_FOO);
+    //entityRemoveComponent(scene, a, COMPONENT_TYPE_FOO);
     //entityRemoveComponentType(scene, a, COMPONENT_TYPE_FOO);
 
-    avLog(AV_DEBUG, "Entity %x has %u foo components", a, entityHasComponent(scene, a, COMPONENT_TYPE_FOO));
+    avLog(AV_DEBUG, "Entity %x has %u foo components", foo, entityHasComponent(scene, foo, COMPONENT_TYPE_FOO));
 
     sceneApply(scene);
+
+    avLog(AV_DEBUG, "Entity %x has %u foo components", foo, entityHasComponent(scene, foo, COMPONENT_TYPE_FOO));
 
     JobFence fence; 
     jobFenceCreate(&fence);

@@ -1,13 +1,16 @@
 #pragma once
 #include "ecs.h"
-
+#include "ecsStaging.h"
 #include <AvUtils/avMemory.h>
 #include <AvUtils/threading/avRwLock.h>
 #include <AvUtils/threading/avThread.h>
 #include <AvUtils/memory/avAllocator.h>
 #include "logging.h"
-
+#include "jobs/jobs.h"
 #include <stdatomic.h>
+
+#include "containers/listpool.h"
+
 
 #define COMPONENT_REGISTRY_SIZE MAX_COMPONENT_COUNT
 typedef struct ComponentEntry {
@@ -29,6 +32,7 @@ typedef Entity LocalEntity;
 #define INVALID_ENTITY_TYPE ((EntityTypeID)-1)
 //#define ENTITY_ID_RESERVED ((Entity)-2)
 
+#define ENTITY_STAGED_BIT (1U<<31)
 
 #define ENTITY_LOCAL_INDEX(entity) ((entity) & 0xff)
 #define ENTITY_CHUNK(entity) (((entity) & ((MAX_CHUNKS-1)<<8))>>8)
@@ -41,6 +45,8 @@ typedef Entity LocalEntity;
 #define ENTITY_INDEX(entity) ((entity) & 0xffffff)
 
 #define GLOBAL_ENTITY(generation, entity) ((((generation)&0x7f)<<24)|((entity)&0xffffff))
+
+
 
 #define CHUNK_CAPACITY 5 //256
 typedef struct EntityChunk {
@@ -69,34 +75,49 @@ typedef struct EntityType {
     uint32* chunks;
     EntityTypeID typeID;
     Scene scene;
+
+    GenericList systems;
 }EntityType;
 
-typedef struct StagedComponent{
-    ComponentType type;
-    Entity entity;
-    uint32 lastModifiedCommandIndex;
-    bool8 isClone;
-    bool8 isDestroyed;
-    //uint32 index;
-    byte* data;
-} StagedComponent;
+typedef struct SelectionAccessCriteria {
+    ComponentMask requiredRead; // entities must contain
+    ComponentMask requiredWrite; // entities must contain
+    ComponentMask excluded; // entities must not contain (internally checked)
+} SelectionAccessCriteria;
 
-typedef struct StagedEntity {
-    ComponentMask mask;
-    uint32 createCommandIndex;
-    Entity ID;
-    struct StagedComponentList{
-        StagedComponent data;
-        struct StagedComponentList* next;
-    }* components;
-}StagedEntity;
+typedef enum SystemExecution {
+    SYSTEM_EXECUTE_ASYNC,
+    SYSTEM_EXECUTE_SEMI_SYNCHRONOUS,
+    SYSTEM_EXECUTE_SYNCHRONOUS
+} SystemExecution;
 
-typedef struct StagingBuffer {
-    uint8 threadID;
-    AvAllocator componentAllocator;
-    StagedEntity* entities;
-    AvAllocator componentHandleAllocator;
-} StagingBuffer;
+typedef struct ComponentAccessor{
+    void* arrays[MAX_COMPONENT_COUNT];
+} ComponentAccessor;
+
+typedef struct SystemChunk {
+    uint32 chunkId;
+    uint32 entityCount;
+    Entity* entities;
+    ComponentMask components;
+    ComponentAccessor accessor;
+} SystemChunk;
+
+typedef void (*SystemProcessFn)(void* ctx, uint32 entityCount, Entity* entities, ComponentAccessor* accessor);
+// all submited jobBathces must use the provided fence (dependencies may be used)
+typedef void (*SystemDispatchFn)(void* ctx, SystemProcessFn process, uint32 chunkCount, SystemChunk* chunks, JobFence fence);
+
+typedef uint32 EcsSystemID;
+
+typedef struct System{
+    GenericList entityTypes;
+    SelectionAccessCriteria selection;
+    SystemExecution execution;
+    SystemProcessFn process;
+    SystemDispatchFn dispatchOverride;
+    void* ctx;
+} System;
+
 
 struct Scene {
     uint32 entityTypeCapacity;
@@ -113,9 +134,15 @@ struct Scene {
     uint8* entityGeneration;
     //Entity* entityReference;
 
-    StagingBuffer* stagingBuffers; // IDMAPPING
+    struct CommandBuffer* stagingBuffers; // IDMAPPING
+
+    ListPool pool;
+
+    System* systems;
 };
 
+
+bool32 isQuerrySelected(SelectionAccessCriteria criteria, ComponentMask mask);
 
 uint32 getComponentSize(ComponentType component);
 ComponentConstructor getComponentConstructor(ComponentType component);
@@ -129,20 +156,8 @@ void freeEntityID(Scene scene, Entity entity);
 bool32 getEntityDetails(Scene scene, Entity entity, uint32* index, LocalEntity* localEntity, uint8* generation, bool8* staged);
 LocalEntity getEntityLocal(Scene scene, Entity entity);
 
-bool32 createEmptyEntity(Scene scene, Entity entity, ComponentMask mask);
+bool32 createEmptyEntity(Scene scene, Entity entity, ComponentMask mask, EntityType** entityType, LocalEntity* locEntity, EntityChunk** chunkPtr);
 EntityChunk* getLocalEntityChunk(LocalEntity localEntity);
 uint32 getLocalEntityLocalIndex(LocalEntity localEntity);
 EntityType* getEntityType(Scene scene, EntityTypeID type);
 uint32 getComponentIndex(EntityType* type, ComponentType component);
-
-typedef struct StagingBuffer* StagingBufferHandle;
-
-void stagingBufferCreate(Scene scene, AvThreadID threadId);
-void stagingBufferDestroy(Scene scene, AvThreadID threadId);
-bool32 stagedEntityDestroy(Scene scene, StagingBufferHandle buffer, Entity entity);
-bool32 stagedEntityRemoveComponent(Scene scene, StagingBufferHandle buffer, Entity entity, ComponentType type);
-bool32 stagedEntityAddComponent(Scene scene, StagingBufferHandle buffer, Entity entity, ComponentInfo* info);
-Entity stagedEntityCreate(Scene scene, StagingBufferHandle buffer, ComponentInfoRef info);
-bool32 stagedEntityHasComponent(Scene scene, StagingBufferHandle buffer, Entity entity, ComponentType type);
-
-bool32 stagingBufferCommit(Scene scene, StagingBufferHandle buffer);

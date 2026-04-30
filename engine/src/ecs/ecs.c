@@ -1,8 +1,11 @@
 #include "ecsInternal.h"
 #include "ecsStaging.h"
+#include "ecsQuerries.h"
 
 #include "containers/darray.h"
 #include "containers/idMapping.h"
+#include "containers/listpool.h"
+
 
 static ComponentRegistry componentRegistry = {0};
 
@@ -137,49 +140,11 @@ ComponentDestructor getComponentDestructor(ComponentType component){
     return componentRegistry.entries[component].destructor;
 }
 
-AV_API bool32 componentMaskContains(ComponentMask mask, ComponentMask componentMask){
-    for(uint32 i = 0; i < COMPONENT_MASK_SIZE; i++) {
-        if((mask.bits[i] & componentMask.bits[i]) != componentMask.bits[i]) return 0;
-    }
-    return 1;
+
+AV_API ComponentMask getRegisteredComponents(){
+    return componentRegistry.registeredComponents;
 }
 
-AV_API bool32 componentMaskEquals(ComponentMask maskA, ComponentMask maskB){
-    for(uint32 i = 0; i < COMPONENT_MASK_SIZE; i++){
-        if(maskA.bits[i] != maskB.bits[i]) return false;
-    }
-    return true;
-}
-
-AV_API ComponentMask componentMaskAnd(ComponentMask maskA, ComponentMask maskB){
-    ComponentMask mask = {0};
-    for(uint32 i = 0; i < COMPONENT_MASK_SIZE; i++){
-        mask.bits[i] = maskA.bits[i] & maskB.bits[i];
-    }
-    return mask;
-}
-AV_API ComponentMask componentMaskOr(ComponentMask maskA, ComponentMask maskB){
-    ComponentMask mask = {0};
-    for(uint32 i = 0; i < COMPONENT_MASK_SIZE; i++){
-        mask.bits[i] = maskA.bits[i] | maskB.bits[i];
-    }
-    return mask;
-}
-
-AV_API ComponentMask componentMaskInvert(ComponentMask mask){
-    for(uint32 i = 0; i < COMPONENT_MASK_SIZE; i++){
-        mask.bits[i] = ~mask.bits[i];
-    }
-    return componentMaskAnd(mask, componentRegistry.registeredComponents);
-}
-
-AV_API uint32 componentMaskCount(ComponentMask mask){
-    uint32 count = 0;
-    for(uint32 i = 0; i < COMPONENT_MASK_SIZE; i++){
-        count += __builtin_popcountll(mask.bits[i]);
-    }
-    return count;
-}
 
 static ChunkPool chunkPool;
 static void initChunkPool(){
@@ -360,13 +325,11 @@ static uint32 createChunk(EntityType* type){
     uint32 chunkID = allocateChunk(type->scene);
     EntityChunk* chunk = getChunk(chunkID);
     chunk->entityType = type->typeID;
-    uint32 index = 0;
     ITERATE_MASK(mask, component){
         uint32 size = getComponentSize(component);
         bool32 isArray = false;
-        chunk->components[index] = (Component) { avAllocate((size!=0 ? size*CHUNK_CAPACITY : 1), "") };
-        avMemset(chunk->components[index], 0, size);
-        index++;
+        chunk->components[component] = (Component) { avAllocate((size!=0 ? size*CHUNK_CAPACITY : 1), "") };
+        avMemset(chunk->components[component], 0, size);
     }
     chunk->count = 0;
     
@@ -407,6 +370,8 @@ static void removeEntityType(EntityType* type){
     scene->entityTypeIndex[lastID] = index;
     scene->entityTypeIndex[id] = lastIndex;
     scene->entityTypeCount--;
+
+    LIST_FREE(type->systems);
 }
 
 static void destroyChunk(EntityType* type, uint32 chunkID);
@@ -434,8 +399,22 @@ static bool32 destroyEntityTypeChunks(EntityType* type){
     if(type->chunks) avFree(type->chunks);
 }
 
-static bool32 destroyEntityType(EntityType* type){
+static void unregisterSystems(Scene scene, EntityType* type){
+    LIST_FOR(type->systems, EcsSystemID, sys){
+        System* system = MAPPING_GET(scene->systems, *sys);
+        LIST_FOR_I(system->entityTypes, i){
+            EntityTypeID entityId = LIST_GET(system->entityTypes, EntityTypeID, i);
+            if(entityId == type->typeID){
+                LIST_SWAP_POP(system->entityTypes, i);
+                break;
+            }
+        }
+    }
+}
+
+static bool32 destroyEntityType(Scene scene, EntityType* type){
     if(!destroyEntityTypeChunks(type)) return false;
+    unregisterSystems(scene, type);
     removeEntityType(type);
     return true;
 }
@@ -447,25 +426,38 @@ static void destroyChunk(EntityType* type, uint32 chunkID){
     
     ComponentMask mask = type->mask;
 
-    uint32 index = 0;
     ITERATE_MASK(mask, component){
         uint32 size = getComponentSize(component);
         for(uint32 i = 0; i < chunk->count; i++){
-            destroyComponent(type->scene, chunk->entities[i], (byte*)chunk->components[index] + size*i, component);
+            destroyComponent(type->scene, chunk->entities[i], (byte*)chunk->components[component] + size*i, component);
         }
-        avFree(chunk->components[index]);
-        index++;
+        avFree(chunk->components[component]);
     }
 
     freeChunk(chunkID);
     type->chunkCount--;
 }
 
-static void buildComponentIndex(EntityType* type){
-    uint32 index = 0;
-    for(uint32 i = 0; i < MAX_COMPONENT_COUNT; i++){
-        if(MASK_HAS_COMPONENT(type->mask, i)){
-            type->componentIndex[i] = index++;
+static void registerSystems(Scene scene, EntityType* type){
+    for(uint32 i = 0; i < MAPPING_SIZE(scene->systems); i++){
+        System* system = scene->systems + i;
+        if(!isQuerrySelected(system->selection, type->mask)){
+            continue;
+        }
+        EcsSystemID id = MAPPING_ID(scene->systems, i);
+        LIST_PUSH(type->systems, id);
+        LIST_PUSH(system->entityTypes, type->typeID);
+    }
+}
+
+static void registerNewSystem(Scene scene, EcsSystemID id, ComponentMask mask){
+    System* system = MAPPING_GET(scene->systems, id);
+    SelectionAccessCriteria selection = system->selection;
+    for(uint32 i = 0; i < scene->entityTypeCount; i++){
+        EntityType* type = scene->entityTypes + i;
+        if(isQuerrySelected(selection, type->mask)){
+            LIST_PUSH(type->systems, id);
+            LIST_PUSH(system->entityTypes, type->typeID);
         }
     }
 }
@@ -481,9 +473,13 @@ static EntityType* createEntityType(Scene scene, ComponentMask mask){
     EntityType* type = scene->entityTypes + index;
     type->mask = mask;
     type->componentIndex[0] = MAX_COMPONENT_COUNT;
-    buildComponentIndex(type);
     type->typeID = id;
     type->scene = scene;
+
+    LIST_INIT(type->systems, &scene->pool, EcsSystemID);
+
+    registerSystems(scene, type);
+
     return type;
 }
 
@@ -505,9 +501,13 @@ AV_API Scene sceneCreate(){
     scene->entityGeneration[0] = (uint8) ~(ENTITY_STAGED_BIT>>24);
     MAPPING_CREATE(scene->stagingBuffers, AV_MAX_THREADS);
     avRWLockCreate(&scene->entityIdLock);
+
+    initListPool(&scene->pool);
+    MAPPING_CREATE(scene->systems, MAX_SYSTEMS);
     return scene;
 }
 
+void stagingBufferDestroy(Scene scene, AvThreadID threadId);
 AV_API void sceneDestroy(Scene scene){
 
     uint32 typeCount = scene->entityTypeCount;
@@ -522,33 +522,36 @@ AV_API void sceneDestroy(Scene scene){
     avFree(scene->entityGeneration);
     avRWLockDestroy(scene->entityIdLock);
     for(uint32 i = 0; i < MAPPING_SIZE(scene->stagingBuffers); i++){
-        stagingBufferDestroy(scene, scene->stagingBuffers[i].threadID);
+        stagingBufferDestroy(scene, scene->stagingBuffers[i].threadId);
     }
     MAPPING_DESTROY(scene->stagingBuffers);
+    MAPPING_DESTROY(scene->systems);
     avFree(scene);
 
+    freeListPool(&scene->pool);
+
 }
 
-static bool32 buildMasks(ComponentInfo* info, ComponentMask* mask){
-    avMemset(mask, 0, sizeof(ComponentMask));
-    bool32 ret = true;
-    uint32 maxCount = 4096;
-    while(info){
-        if(info->type >= MAX_COMPONENT_COUNT) {
-            ret = false;
-            continue;
-        }
-        if(MASK_HAS_COMPONENT(*mask, info->type)){
-            return false;
-        }else{
-            MASK_ADD_COMPONENT(*mask, info->type);
-        }
-        info = info->next;
-        maxCount--;
-        if(maxCount==0) return false;
-    }
-    return ret;
-}
+// static bool32 buildMasks(ComponentInfo* info, ComponentMask* mask){
+//     avMemset(mask, 0, sizeof(ComponentMask));
+//     bool32 ret = true;
+//     uint32 maxCount = 4096;
+//     while(info){
+//         if(info->type >= MAX_COMPONENT_COUNT) {
+//             ret = false;
+//             continue;
+//         }
+//         if(MASK_HAS_COMPONENT(*mask, info->type)){
+//             return false;
+//         }else{
+//             MASK_ADD_COMPONENT(*mask, info->type);
+//         }
+//         info = info->next;
+//         maxCount--;
+//         if(maxCount==0) return false;
+//     }
+//     return ret;
+// }
 
 static EntityType* findEntityType(Scene scene, ComponentMask mask){
     for(uint32 i = 0; i < scene->entityTypeCount; i++){
@@ -621,12 +624,6 @@ static bool32 swapEntities(Scene scene, Entity entityA, Entity entityB){
     return true;
 }
 
-uint32 getComponentIndex(EntityType* type, ComponentType component){
-    if(type==NULL) return MAX_COMPONENT_COUNT;
-    if(component >= MAX_COMPONENT_COUNT) return MAX_COMPONENT_COUNT;
-    return type->componentIndex[component];
-}
-
 bool32 moveEntity(Scene scene, Entity src, LocalEntity dst){
     if(scene==NULL) return false;
     if(src==INVALID_ENTITY || dst==INVALID_ENTITY) return false;
@@ -690,18 +687,14 @@ bool32 moveEntity(Scene scene, Entity src, LocalEntity dst){
 
     ITERATE_MASK(rawCopy, component){
         uint32 size = getComponentSize(component);
-        uint32 componentSrcIndex = getComponentIndex(srcType, component);
-        uint32 componentDstIndex = getComponentIndex(dstType, component);
-        byte* srcOffset = ((byte*)srcChunk->components[componentSrcIndex]) + srcIndex*size;
-        byte* dstOffset = ((byte*)dstChunk->components[componentDstIndex]) + dstIndex*size;
+        byte* srcOffset = ((byte*)srcChunk->components[component]) + srcIndex*size;
+        byte* dstOffset = ((byte*)dstChunk->components[component]) + dstIndex*size;
         avMemcpy(dstOffset, srcOffset, size);
     }
     ITERATE_MASK(zeroMem, component){
         uint32 size = getComponentSize(component);
-        uint32 componentSrcIndex = getComponentIndex(srcType, component);
-        uint32 componentDstIndex = getComponentIndex(dstType, component);
-        byte* srcOffset = ((byte*)srcChunk->components[componentSrcIndex]) + srcIndex*size;
-        byte* dstOffset = ((byte*)dstChunk->components[componentDstIndex]) + dstIndex*size;
+        byte* srcOffset = ((byte*)srcChunk->components[component]) + srcIndex*size;
+        byte* dstOffset = ((byte*)dstChunk->components[component]) + dstIndex*size;
         avMemset(dstOffset, 0 , size);
     }
 
@@ -719,7 +712,7 @@ bool32 moveEntity(Scene scene, Entity src, LocalEntity dst){
         destroyChunk(srcType, getChunkID(srcChunk));
         
         if(srcType->chunkCount==0){
-            destroyEntityType(srcType);
+            destroyEntityType(scene, srcType);
         }
     }
 
@@ -746,13 +739,12 @@ static void performDestructor(Scene scene, uint32 i, EntityChunk* chunk, EntityT
     performDestructorMasked(scene, i, chunk, type, type->mask);
 }
 
-static void createComponent(Scene scene, Entity entity, ComponentData data, ComponentType type, ComponentInfo* info){
+static void createComponent(Scene scene, Entity entity, ComponentData data, ComponentType type, void* constructorData, uint32 constructorDataSize){
   
     ComponentConstructor constructor = getComponentConstructor(type);
     uint32 size = getComponentSize(type);
     if(constructor){
-        // TODO: fix
-        //constructor(scene, entity, data, size, info);
+        constructor(scene, entity, data, size, constructorData, constructorDataSize);
     }
 }
 
@@ -767,36 +759,36 @@ void performConstructorMasked(Scene scene, uint32 i, EntityChunk* chunk, EntityT
     uint32 index = 0;
     ITERATE_MASK(mask, component){
         uint32 size = getComponentSize(component);
-        avMemset((byte*)chunk->components[index] + size * entityIndex, 0, size);
+        byte* base = (byte*) chunk->components[component];
+        void* comp = base + entityIndex * size;
+        avMemset(comp, 0, size);
+        createComponent(scene, chunk->entities[entityIndex], comp, component, constructorData[component], constructorDataSize[component]);
         index++;
-    }
-
-    while(info){
-        ComponentType comp = info->type;
-
-        if(!MASK_HAS_COMPONENT(type->mask, comp)){
-            info = info->next;
-            continue;
-        }
-
-        uint32 compIndex = getComponentIndex(type, comp);
-        if(compIndex == INVALID_COMPONENT){
-            info = info->next;
-            continue;
-        }
-
-        uint32 size = getComponentSize(comp);
-        byte* base = (byte*) chunk->components[compIndex];
-        
-        void* dst = base + entityIndex * size;
-        createComponent(scene, chunk->entities[entityIndex], dst, comp, info);
-        info = info->next;
     }
 }
 
-static void performConstructor(Scene scene, uint32 i, EntityChunk* chunk, EntityType* type, ComponentInfo* info){
-    if(type==NULL) return;
-    performConstructorMasked(scene, i, chunk, type, type->mask, info);
+// static void performConstructor(Scene scene, uint32 i, EntityChunk* chunk, EntityType* type, ComponentInfo* info){
+//     if(type==NULL) return;
+//     performConstructorMasked(scene, i, chunk, type, type->mask, info);
+// }
+
+bool32 removeEntity(Scene scene, Entity entity, EntityChunk* chunk, EntityType* type){
+    uint32 lastIndex = chunk->count - 1;
+    Entity lastEntity = getEntity(getChunkID(chunk), lastIndex);
+    if(swapEntities(scene, entity, lastEntity)==false) return false;
+
+    chunk->entities[lastIndex] = INVALID_ENTITY;
+    freeEntityID(scene, entity);
+
+    chunk->count--;
+
+    if(chunk->count==0){
+        destroyChunk(type, getChunkID(chunk));
+
+        if(type->chunkCount==0){
+            destroyEntityType(scene, type);
+        }
+    }
 }
 
 static bool32 destroyEntity(Scene scene, Entity entity){
@@ -811,23 +803,8 @@ static bool32 destroyEntity(Scene scene, Entity entity){
     EntityType* type = getEntityType(scene, chunk->entityType);
     if(type==NULL) return false;
     performDestructor(scene, index, chunk, type);
-    uint32 lastIndex = chunk->count - 1;
-    Entity lastEntity = getEntity(getChunkID(chunk), lastIndex);
-    if(swapEntities(scene, entity, lastEntity)==false) return false;
-
-    chunk->entities[lastIndex] = INVALID_ENTITY;
-    freeEntityID(scene, entity);
-
-    chunk->count--;
-
-    if(chunk->count==0){
-        destroyChunk(type, getChunkID(chunk));
-
-        if(type->chunkCount==0){
-            destroyEntityType(type);
-        }
-    }
-  
+    
+    removeEntity(scene, entity, chunk, type);
 
     return true;
 }
@@ -895,89 +872,28 @@ bool32 createEmptyEntity(Scene scene, Entity entity, ComponentMask mask, EntityT
     return true;
 }
 
-static Entity createEntity(EntityType* type){
-    if(type==NULL) return INVALID_ENTITY;
-    
-    uint32 localIndex = 0;
-    EntityChunk* chunk = NULL;
-    Entity localEntity = createLocalEntity(type, &chunk, &localIndex);
-    if(localEntity==INVALID_ENTITY) return INVALID_ENTITY;
-
-    Entity entity = allocateEntityID(type->scene, localEntity, false);
-    
-    chunk->entities[localIndex] = entity;
-    return chunk->entities[localIndex];
-}
-
-static bool32 isComponentInfoCompatible(ComponentMask mask, ComponentInfo* info){
-    ComponentMask createMask = {0};
-    ComponentMask createArrayMask = {0};
-    if(!buildMasks(info, &createMask)) return false;
-    return true;
-}
-
-static bool32 entityChangeType(Scene scene, Entity entity, EntityType* dst, ComponentInfo* info){
-    if(scene==NULL) return false;
-    if(entity==INVALID_ENTITY) return false;
-    if(dst==NULL) return false;
-    
-    EntityType* src = getType(scene, entity);
-    if(src==dst) return true;
-
-    if(componentMaskEquals(src->mask, dst->mask)){
-        return true; //nothing needs to be done
-    }
-
-    ComponentMask transitionMask = componentMaskAnd(src->mask, dst->mask);
-    ComponentMask createMask = componentMaskAnd(componentMaskInvert(transitionMask), dst->mask);
-    ComponentMask destroyMask = componentMaskAnd(componentMaskInvert(transitionMask), src->mask);
-
-    
-    if(!isComponentInfoCompatible(createMask, info)){
-        return false;
-    }
-
-    
-    LocalEntity dstEntity = createLocalEntity(dst, NULL, NULL);
-    if(dstEntity==INVALID_ENTITY) return false;
-    
-    performDestructorMasked(scene, getEntityLocalIndex(scene, entity), getEntityChunk(scene, entity), src, destroyMask);
-    moveEntity(scene, entity, dstEntity);
-    performConstructorMasked(scene, getEntityLocalIndex(scene, entity), getEntityChunk(scene, entity), dst, createMask, info);
-
-    return true;
-}
-
 void stagingBufferCreate(Scene scene, AvThreadID threadId){
     if(scene == NULL || threadId >= AV_MAX_THREADS) return;
 
-    StagingBuffer buffer = {0};
-    buffer.threadID = threadId;
-    avAllocatorCreate(0, AV_ALLOCATOR_TYPE_DYNAMIC, &buffer.componentAllocator);
-    avAllocatorCreate(0, AV_ALLOCATOR_TYPE_DYNAMIC, &buffer.componentHandleAllocator);
-    buffer.entities = darrayCreate(StagedEntity);
+    CommandBuffer buffer = {0};
+    buffer.threadId = threadId;
+    commandBufferCreate(&buffer);
     MAPPING_INSERT(scene->stagingBuffers, threadId, buffer);
 }
 
 void stagingBufferDestroy(Scene scene, AvThreadID threadId){
-    if(darrayLength(scene->stagingBuffers[threadId].entities)){
-        return; // entities are still in use
-    }
-
-    avAllocatorDestroy(&scene->stagingBuffers[threadId].componentAllocator);
-    avAllocatorDestroy(&scene->stagingBuffers[threadId].componentHandleAllocator);
-    darrayDestroy(scene->stagingBuffers[threadId].entities);
+    commandBufferDestroy(MAPPING_GET(scene->stagingBuffers, threadId));
     MAPPING_REMOVE(scene->stagingBuffers, threadId);
 }
 
-StagingBufferHandle getStagingBuffer(Scene scene, AvThreadID threadId){
+CommandBuffer* getStagingBuffer(Scene scene, AvThreadID threadId){
     if(scene==NULL || threadId >= AV_MAX_THREADS) return NULL;
-    if(MAPPING_GET(scene->stagingBuffers, threadId)->threadID==AV_MAIN_THREAD_ID){
+    CommandBuffer* buffer = MAPPING_GET(scene->stagingBuffers, threadId);
+    if(buffer==NULL){
         stagingBufferCreate(scene, threadId);
         return MAPPING_GET(scene->stagingBuffers, threadId);
-    }else{
-        return MAPPING_GET(scene->stagingBuffers, threadId);
     }
+    return buffer;
 }
 
 EntityType* findOrCreateEntityType(Scene scene, ComponentMask mask){
@@ -988,87 +904,34 @@ EntityType* findOrCreateEntityType(Scene scene, ComponentMask mask){
     return type;
 }
 
-AV_API Entity entityCreate(Scene scene, ComponentInfoRef info){
+AV_API Entity entityCreate(Scene scene){
     AvThreadID threadId = avThreadGetID();
     if(threadId!=AV_MAIN_THREAD_ID){
-        return stagedEntityCreate(scene, getStagingBuffer(scene, threadId), info);
-    }
-
-
-    ComponentMask mask = {0};
-    if(!buildMasks(info, &mask)){
+        avWarn("Cannot create entity from other than main thread");
         return INVALID_ENTITY;
     }
-
-    EntityType* type = findOrCreateEntityType(scene, mask);
-    if(type==NULL) return INVALID_ENTITY;
-
-    Entity entity = createEntity(type);
-
-    performConstructor(scene, getEntityLocalIndex(scene, entity), getEntityChunk(scene, entity), type, info);
-
+    Entity entity = allocateEntityID(scene, 0, true);
     return entity;
 }
 
 
 
-AV_API bool32 entityAddComponent(Scene scene, Entity entity, ComponentInfoRef info){
+AV_API bool32 entityAddComponent(Scene scene, Entity entity, ComponentType type, void* constructorData, uint32 constructorDataSize){
     AvThreadID threadId = avThreadGetID();
-    if(threadId != AV_MAIN_THREAD_ID){
-        return stagedEntityAddComponent(scene, getStagingBuffer(scene, threadId), entity, info);
-    }
-
-    EntityType* type = getType(scene, entity);
-    if(type==NULL){
-        return false;
-    }
-
-    ComponentMask mask = {0};
-    ComponentMask arrayMask = {0};
-    if(!buildMasks(info, &mask)){
-        return false;
-    }
-    if(componentMaskEquals(mask, (ComponentMask){0})){
-        return false; // cannot add none components
-    }
-
-    
-
-    ComponentMask typeMask = type->mask;
-    if(!componentMaskEquals(componentMaskAnd(typeMask, mask), (ComponentMask){0})){
-        return false; //cannot add duplicate components;
-    }
-    ComponentMask newMask = componentMaskOr(typeMask, mask);
-
-    type = findOrCreateEntityType(scene, newMask);
-    return entityChangeType(scene, entity, type, info);
+    cmdEntityAddComponent(scene, getStagingBuffer(scene, threadId), entity, type, constructorData, constructorDataSize);
+    return true;
 }
 
 AV_API bool32 entityRemoveComponent(Scene scene, Entity entity, ComponentType component){
     AvThreadID threadId = avThreadGetID();
-    if(threadId != AV_MAIN_THREAD_ID){
-        return stagedEntityRemoveComponent(scene, getStagingBuffer(scene, threadId), entity, component);
-    }
-    EntityType* type = getType(scene, entity);
-    if(type==NULL){
-        return false;
-    }
-    if(!MASK_HAS_COMPONENT(type->mask, component)) return false;
-    ComponentMask newMask = type->mask;
-    MASK_REMOVE_COMPONENT(newMask, component);
-
-    type = findOrCreateEntityType(scene, newMask);
-    return entityChangeType(scene, entity, type, NULL);
-
+    cmdEntityRemoveComponent(scene, getStagingBuffer(scene, threadId), entity, component);
+    return true;
 }
 
 AV_API bool32 entityDestroy(Scene scene, Entity entity){
-    if(entity==INVALID_ENTITY) return false;
     AvThreadID threadId = avThreadGetID();
-    if(threadId != AV_MAIN_THREAD_ID){
-        return stagedEntityDestroy(scene, getStagingBuffer(scene, threadId), entity);
-    }
-    return destroyEntity(scene, entity);
+    cmdEntityDestroy(scene, getStagingBuffer(scene, threadId), entity);
+    return true;
 }
 
 AV_API bool32 entityHasComponent(Scene scene, Entity entity, ComponentType component){
@@ -1077,9 +940,7 @@ AV_API bool32 entityHasComponent(Scene scene, Entity entity, ComponentType compo
     LocalEntity localEntity = INVALID_ENTITY;
     if(!getEntityDetails(scene, entity, NULL, &localEntity, NULL, &isStaged)) return false;
     if(isStaged){
-        AvThreadID threadId = avThreadGetID();
-        if(threadId == AV_MAIN_THREAD_ID) return false;
-        return stagedEntityHasComponent(scene, getStagingBuffer(scene, threadId), entity, component);
+        return false;
     }
 
     EntityChunk* chunk = getLocalEntityChunk(localEntity);
@@ -1101,14 +962,12 @@ AV_API void* entityGetComponent(Scene scene, Entity entity, ComponentType compon
 
     EntityChunk* chunk = getEntityChunk(scene, entity);
     uint32 localIndex = getEntityLocalIndex(scene, entity);
-    uint32 compIndex = getComponentIndex(type, component);
-    if(compIndex==INVALID_COMPONENT) return NULL;
 
     uint32 size = getComponentSize(component);
 
     byte* offset = NULL;
     
-    offset = (byte*) chunk->components[compIndex];
+    offset = (byte*) chunk->components[component];
 
     return offset + localIndex*size;
 }
@@ -1120,10 +979,9 @@ void* entityGetComponentFast(Scene scene, Entity entity, ComponentType component
     EntityType* type = getType(scene, entity);
     EntityChunk* chunk = getEntityChunk(scene, entity);
     uint32 localIndex = getEntityLocalIndex(scene, entity);
-    uint32 compIndex = getComponentIndex(type, component);
     uint32 size = getComponentSize(component);
     byte* offset = NULL;
-    offset = (byte*) chunk->components[compIndex];
+    offset = (byte*) chunk->components[component];
     return offset + localIndex*size;
 }
 
@@ -1131,9 +989,10 @@ void* entityGetComponentFast(Scene scene, Entity entity, ComponentType component
 void sceneApply(Scene scene){
     if(scene==NULL) return;
     AvThreadID threadId = avThreadGetID();
-    if(threadId != AV_MAIN_THREAD_ID) return;
+    if(threadId != AV_MAIN_THREAD_ID) {
+        avWarn("Cannot apply scene from other than the main thread");
+        return;
+    };
 
-    for(uint32 i = 0; i < MAPPING_SIZE(scene->stagingBuffers); i++){
-        //if(scene->stagingBuffers[i].threadID==AV_MAIN_THREAD_ID)continue; 
-    }
+    applyCommandBuffers(scene, scene->stagingBuffers, MAPPING_SIZE(scene->stagingBuffers));
 }

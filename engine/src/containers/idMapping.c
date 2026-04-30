@@ -8,7 +8,6 @@ typedef struct IDmappingHeader{
     uint32* index;
     uint32* reference;
     uint32 stride;
-    byte data[];
 } IDmappingHeader;
 
 #define MAPPING_HEADER(mapping) (((IDmappingHeader*)(mapping))-1)
@@ -33,7 +32,7 @@ uint32 idMappingAdd(void** mapping, void* data){
             header->addressCapacity = header->capacity;
         }
         IDmappingHeader* newHeader = avAllocate(sizeof(IDmappingHeader) + header->stride * header->capacity + sizeof(uint32)*header->capacity + sizeof(uint32)*header->addressCapacity, "");
-        newHeader->index = (uint32*)(((byte*)header) + sizeof(IDmappingHeader) + header->stride*header->capacity);
+        newHeader->index = (uint32*)(((byte*)newHeader) + sizeof(IDmappingHeader) + header->stride*header->capacity);
         newHeader->reference = newHeader->index + header->addressCapacity;
         avMemcpy(newHeader, header, sizeof(IDmappingHeader) + header->stride*oldCapacity);
         avMemcpy(newHeader->index, header->index, sizeof(uint32)*oldAddressCapacity);
@@ -42,7 +41,7 @@ uint32 idMappingAdd(void** mapping, void* data){
         *mapping = newHeader+1;
         header = newHeader;
         for(uint32 i = oldCapacity; i < header->capacity; i++){
-            avMemset(header->data +  i*header->stride, 0, header->stride);
+            avMemset((byte*)(header+1) +  i*header->stride, 0, header->stride);
             header->reference[i] = i;
         }
         for(uint32 i = oldAddressCapacity; i < header->addressCapacity; i++){
@@ -50,7 +49,7 @@ uint32 idMappingAdd(void** mapping, void* data){
         }
     }
     uint32 index = header->count++;
-    avMemcpy(header->data + index*header->stride, data, header->stride);
+    avMemcpy((byte*)(header+1) + index*header->stride, data, header->stride);
     return header->reference[index];
 }
 
@@ -66,7 +65,7 @@ bool32 idMappingRemove(void** mapping, uint32 id){
     if(lastIndex==index){
         return true;
     }
-    avMemswap(header->data + header->stride*index, header->data + header->stride*lastIndex, header->stride);
+    avMemswap((byte*)(header+1) + header->stride*index, (byte*)(header+1) + header->stride*lastIndex, header->stride);
     header->reference[lastIndex] = id;
     header->reference[index] = lastId;
     header->index[id] = lastIndex;
@@ -90,7 +89,7 @@ bool32 idMappingInsert(void** mapping, uint32 id, void* data){
     header->reference[oldIndex] = id;
 
     header->index[oldId] = index;
-    header->reference[index] = oldIndex;
+    header->reference[index] = oldId;
     return true;
 }
 
@@ -102,11 +101,12 @@ bool32 idMappingCreate(void** mapping, uint32 stride, uint32 addressCapacity){
     header->stride = stride;
     header->addressCapacity = addressCapacity;
     header->count = 0;
-    header->index = (uint32*)(header->data + stride);
+    header->index = (uint32*)((byte*)(header+1) + stride);
     header->reference = header->index + 1;
     for(uint32 i = 0; i < addressCapacity; i++){
         header->index[i] = i;
     }
+    header->reference[0] = 0;
     *mapping = header+1;
     return true;
 }
@@ -124,4 +124,12 @@ uint32 idMappingCount(void** mapping){
     if(*mapping==NULL) return 0;
     IDmappingHeader* header = MAPPING_HEADER(*mapping);
     return header->count;
+}
+
+uint32 idMappingGetId(void** mapping, uint32 index){
+    if(mapping==NULL) return (uint32)-1;
+    if(*mapping==NULL) return (uint32)-1;
+    IDmappingHeader* header = MAPPING_HEADER(*mapping);
+    if(index >= header->count) return (uint32)-1;
+    return header->reference[index];
 }
