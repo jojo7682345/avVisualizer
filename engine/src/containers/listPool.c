@@ -1,6 +1,7 @@
 #include "listpool.h"
 
 #include <AvUtils/avMemory.h>
+#include "logging.h"
 
 void initListPool(ListPool* pool){
     for(uint32 i = 0; i < MAX_SIZE_CLASSES; i++){
@@ -23,6 +24,7 @@ void freeListPool(ListPool* pool){
             list->head = node->next;
 
             list->count--;
+            //avDebug("Freed class from pool %u", i);
             avFree(node);
         }
     }
@@ -42,6 +44,7 @@ void* poolAlloc(ListPool* pool, uint32 class, uint32 stride){
     }
 
     uint32 size = (1U << class) * stride;
+    //avDebug("Allocated class %u", class);
     return avAllocate(size, "");
 }
 
@@ -56,10 +59,11 @@ void poolFree(ListPool* pool, void* ptr, uint32 class, uint32 stride){
     FreeList* list = &pool->lists[class];
 
     if(list->totalBytes + size > pool->maxBytesPerClass){
+        //avDebug("Freed class %u", class);
         avFree(ptr);
         return;
     }
-
+   // avDebug("Returned class %u", class);
     FreeNode* node = (FreeNode*) ptr;
     node->next = list->head;
     list->head = node;

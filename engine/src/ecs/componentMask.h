@@ -1,11 +1,14 @@
 #pragma once 
 #include "defines.h"
+#include <stdarg.h>
 
 #define COMPONENT_MASK_SIZE 8
 #define MAX_COMPONENT_COUNT (COMPONENT_MASK_SIZE * 64)
 typedef struct ComponentMask{
     uint64 bits[COMPONENT_MASK_SIZE];
 } ComponentMask;
+
+typedef uint16 ComponentType;
 
 #define MASK_HAS_COMPONENT(mask, componentId) (((componentId) < MAX_COMPONENT_COUNT)&&((mask).bits[(componentId) >> 6] & (1ULL<<((componentId) & (63))))!=0)
 #define MASK_ADD_COMPONENT(mask, componentId) if((componentId) < MAX_COMPONENT_COUNT) ((mask).bits[(componentId) >> 6] |= 1ULL << ((componentId) & 63))
@@ -17,6 +20,18 @@ typedef struct ComponentMask{
     for (uint32 index = (__index__ * 64 + __builtin_ctzll(__bits__)); index != ((uint32)-1); index = ((uint32)-1))
 
 #define componentMaskMake(...) componentMaskMake_(__VA_ARGS__ __VA_OPT__(,) MAX_COMPONENT_COUNT)
+
+static inline ComponentMask componentMaskMake_(ComponentType first, ...){
+    va_list args;
+    va_start(args, first);
+    ComponentMask mask = {0};
+    ComponentType id = first;
+    while(id<MAX_COMPONENT_COUNT){
+        MASK_ADD_COMPONENT(mask, id);
+        id = (ComponentType)va_arg(args, uint32);
+    }
+    return mask;
+}
 
 static inline bool32 componentMaskContains(ComponentMask mask, ComponentMask componentMask){
     for(uint32 i = 0; i < COMPONENT_MASK_SIZE; i++) {

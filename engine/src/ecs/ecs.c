@@ -6,6 +6,8 @@
 #include "containers/idMapping.h"
 #include "containers/listpool.h"
 
+#include <AvUtils/avMath.h>
+
 
 static ComponentRegistry componentRegistry = {0};
 
@@ -181,7 +183,7 @@ static uint32 getChunkID(EntityChunk* chunk){
     return chunkPool.chunkReference[chunkIndex];
 }
 
-static EntityChunk* getChunk(uint32 chunkID){
+EntityChunk* getChunk(uint32 chunkID){
     if(chunkID >= MAX_CHUNKS) return NULL;
     uint32 index = chunkPool.chunkIndex[chunkID];
     if(index >= chunkPool.chunkCount) return NULL;
@@ -278,10 +280,10 @@ static void freeChunk(uint32 chunkID){
     EntityChunk* lastChunk = &chunkPool.chunks[lastIndex]; 
 
     avMemcpy(chunk, lastChunk, sizeof(EntityChunk));
-    chunkPool.chunkReference[index] = lastIndex;
-    chunkPool.chunkReference[lastIndex] = index;
+    chunkPool.chunkReference[index] = lastID;
+    chunkPool.chunkReference[lastIndex] = chunkID;
     chunkPool.chunkIndex[chunkID] = lastIndex;
-    chunkPool.chunkIndex[lastID] = chunkID;
+    chunkPool.chunkIndex[lastID] = index;
     chunkPool.chunkCount--;
 }
 
@@ -329,6 +331,7 @@ static uint32 createChunk(EntityType* type){
         uint32 size = getComponentSize(component);
         bool32 isArray = false;
         chunk->components[component] = (Component) { avAllocate((size!=0 ? size*CHUNK_CAPACITY : 1), "") };
+        avDebug("Alloc %u", chunkID);
         avMemset(chunk->components[component], 0, size);
     }
     chunk->count = 0;
@@ -342,11 +345,33 @@ static uint32 createChunk(EntityType* type){
     return chunkID;
 }
 
+
+
 static void destroyComponent(Scene scene, Entity entity, ComponentData data, ComponentType type){
     ComponentDestructor destructor = getComponentDestructor(type);
     if(destructor) {
         destructor(scene, entity, data, getComponentSize(type));
     }
+}
+
+static void destroyChunk(EntityType* type, uint32 chunkID){
+    EntityChunk* chunk = getChunk(chunkID);
+    if(chunk == NULL) return;
+    if(type == NULL) return;
+    
+    ComponentMask mask = type->mask;
+
+    ITERATE_MASK(mask, component){
+        uint32 size = getComponentSize(component);
+        for(uint32 i = 0; i < chunk->count; i++){
+            destroyComponent(type->scene, chunk->entities[i], (byte*)chunk->components[component] + size*i, component);
+        }
+        avDebug("Dealloc %u", chunkID);
+        avFree(chunk->components[component]);
+    }
+
+    freeChunk(chunkID);
+    type->chunkCount--;
 }
 
 static void removeEntityType(EntityType* type){
@@ -370,11 +395,8 @@ static void removeEntityType(EntityType* type){
     scene->entityTypeIndex[lastID] = index;
     scene->entityTypeIndex[id] = lastIndex;
     scene->entityTypeCount--;
-
-    LIST_FREE(type->systems);
 }
 
-static void destroyChunk(EntityType* type, uint32 chunkID);
 static bool32 destroyEntityTypeChunks(EntityType* type){
     if(type==NULL) return false;
     if(type->scene==NULL) return false;
@@ -391,15 +413,17 @@ static bool32 destroyEntityTypeChunks(EntityType* type){
     uint32 lastIndex = scene->entityTypeCount - 1;
     EntityTypeID lastID = scene->entityTypeReference[lastIndex];
     
-    for(uint32 i = 0; i < type->chunkCount; i++){
+    uint32 chunkCount = type->chunkCount;
+    for(uint32 i = 0; i < chunkCount; i++){
         destroyChunk(type, type->chunks[i]);
         
     }
     type->chunkCount = 0;
     if(type->chunks) avFree(type->chunks);
+    LIST_FREE(type->systems);
 }
 
-static void unregisterSystems(Scene scene, EntityType* type){
+static void unregisterEntityTypeFromSystems(Scene scene, EntityType* type){
     LIST_FOR(type->systems, EcsSystemID, sys){
         System* system = MAPPING_GET(scene->systems, *sys);
         LIST_FOR_I(system->entityTypes, i){
@@ -412,30 +436,29 @@ static void unregisterSystems(Scene scene, EntityType* type){
     }
 }
 
-static bool32 destroyEntityType(Scene scene, EntityType* type){
-    if(!destroyEntityTypeChunks(type)) return false;
-    unregisterSystems(scene, type);
-    removeEntityType(type);
-    return true;
+void unregisterSystemFromEntityTypes(Scene scene, EcsSystemID id){
+    System* system = MAPPING_GET(scene->systems, id);
+    if(system==NULL) {
+        avError("Trying to access invalid handle");
+        return;
+    }
+    LIST_FOR(system->entityTypes, EntityTypeID, t){
+        EntityType* type = getEntityType(scene, *t);
+        LIST_FOR_I(type->systems, i){
+            EcsSystemID sysId = LIST_GET(type->systems, EcsSystemID, i);
+            if(sysId = id){
+                LIST_SWAP_POP(type->systems, i);
+                break;
+            }
+        }
+    }
 }
 
-static void destroyChunk(EntityType* type, uint32 chunkID){
-    EntityChunk* chunk = getChunk(chunkID);
-    if(chunk == NULL) return;
-    if(type == NULL) return;
-    
-    ComponentMask mask = type->mask;
-
-    ITERATE_MASK(mask, component){
-        uint32 size = getComponentSize(component);
-        for(uint32 i = 0; i < chunk->count; i++){
-            destroyComponent(type->scene, chunk->entities[i], (byte*)chunk->components[component] + size*i, component);
-        }
-        avFree(chunk->components[component]);
-    }
-
-    freeChunk(chunkID);
-    type->chunkCount--;
+static bool32 destroyEntityType(Scene scene, EntityType* type){
+    unregisterEntityTypeFromSystems(scene, type);
+    if(!destroyEntityTypeChunks(type)) return false;
+    removeEntityType(type);
+    return true;
 }
 
 static void registerSystems(Scene scene, EntityType* type){
@@ -450,7 +473,7 @@ static void registerSystems(Scene scene, EntityType* type){
     }
 }
 
-static void registerNewSystem(Scene scene, EcsSystemID id, ComponentMask mask){
+void registerNewSystem(Scene scene, EcsSystemID id){
     System* system = MAPPING_GET(scene->systems, id);
     SelectionAccessCriteria selection = system->selection;
     for(uint32 i = 0; i < scene->entityTypeCount; i++){
@@ -502,8 +525,10 @@ AV_API Scene sceneCreate(){
     MAPPING_CREATE(scene->stagingBuffers, AV_MAX_THREADS);
     avRWLockCreate(&scene->entityIdLock);
 
+    scene->systemChunkMem = darrayCreate(SystemChunk);
     initListPool(&scene->pool);
     MAPPING_CREATE(scene->systems, MAX_SYSTEMS);
+    scene->systemOrder = darrayCreate(EcsSystemID);
     return scene;
 }
 
@@ -514,6 +539,7 @@ AV_API void sceneDestroy(Scene scene){
     for(uint32 i = 0; i < typeCount; i++){
         // as types are swapped after destruction the we can keep destroying the first element
         destroyEntityTypeChunks(&scene->entityTypes[i]);
+        
     }
     avFree(scene->entityTypes);
     avFree(scene->entityTypeReference);
@@ -525,11 +551,23 @@ AV_API void sceneDestroy(Scene scene){
         stagingBufferDestroy(scene, scene->stagingBuffers[i].threadId);
     }
     MAPPING_DESTROY(scene->stagingBuffers);
+    for(uint32 i = 0; i < MAPPING_SIZE(scene->systems); i++){
+        destroySystemFromPtr(scene, scene->systems + i);
+    }
     MAPPING_DESTROY(scene->systems);
-    avFree(scene);
-
+    darrayDestroy(scene->systemChunkMem);
+    darrayDestroy(scene->systemOrder);
     freeListPool(&scene->pool);
+    
+    
+    avFree(scene);
+}
 
+AV_API void sceneSetSystemsOrder(Scene scene, uint32 systemsCount, EcsSystemID* systems){
+    darrayLengthSet(scene->systemOrder, 0);
+    for(uint32 i = 0; i < systemsCount; i++){
+        darrayPush(scene->systemOrder, systems[i]);
+    }
 }
 
 // static bool32 buildMasks(ComponentInfo* info, ComponentMask* mask){
@@ -812,23 +850,27 @@ static bool32 destroyEntity(Scene scene, Entity entity){
 LocalEntity createLocalEntity(EntityType* type, EntityChunk** chunkPtr, uint32* localIndexPtr){
     if(type==NULL) return INVALID_ENTITY;
     if(type->chunkCount==0){
-        type->chunks = avAllocate(sizeof(EntityChunk*), "");
+        type->chunks = avAllocate(sizeof(uint32), "");
+        type->chunkCapacity = 1;
         type->chunks[type->chunkCount++] = createChunk(type);
     }
     
     EntityChunk* chunk = NULL;
     for(uint32 i = 0; i < type->chunkCount; i++){
         EntityChunk* chnk = getChunk(type->chunks[i]);
-        if(chnk==NULL) continue;
+        if(chnk==NULL) {
+            avFatal("Logic error");
+            return INVALID_ENTITY;
+        };
         if(chnk->count < CHUNK_CAPACITY){
             chunk = chnk;
             break;
         }
     }
 
-    if(chunk==NULL) return INVALID_ENTITY;
-    if(chunk->count == CHUNK_CAPACITY){
+    if(chunk==NULL) {
         type->chunkCapacity *= 2;
+        type->chunkCapacity = AV_MAX(type->chunkCapacity, 1);
         type->chunks = avReallocate(type->chunks, sizeof(uint32)*type->chunkCapacity, "");
         type->chunks[type->chunkCount++] = createChunk(type);
         chunk = getChunk(type->chunks[type->chunkCount-1]);
@@ -863,8 +905,9 @@ bool32 createEmptyEntity(Scene scene, Entity entity, ComponentMask mask, EntityT
     uint32 localIndex = 0;
     EntityChunk* chunk = NULL;
     Entity localEntity = createLocalEntity(type, &chunk, &localIndex);
+    if(localEntity==INVALID_ENTITY)
+        return false;
     chunk->entities[localIndex] = entity;
-    if(localEntity==INVALID_ENTITY) return false;
     modifyEntityID(scene, entity, localEntity, false);
     if(locEntity) *locEntity = localEntity;
     if(entityType) *entityType = type;

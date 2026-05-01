@@ -52,6 +52,13 @@ JobControl exampleJob(byte* input, uint32 inputSize, byte* output, uint32 output
 }
 
 
+JobControl exampleSystemProcess(Scene scene, void* ctx, uint32 entityCount, const Entity* entities, const ComponentData* components, JobContext* context){
+    for(uint32 i = 0; i < entityCount; i++){
+        avDebug("System for %x", entities[i]);
+    }
+    JOB_EXIT();
+} 
+
 bool8 initialize(struct Application* app){
     initializeCpp(app);
 
@@ -61,11 +68,28 @@ bool8 initialize(struct Application* app){
     registerComponent(&COMPONENT_TYPE_BAR, sizeof(BarComponent), barConstructor, barDestructor);
     registerComponent(&COMPONENT_TYPE_BAZ, 0, NULL, NULL);
 
+
+    SelectionAccessCriteria testSelection = {
+        .requiredRead = componentMaskMake(COMPONENT_TYPE_FOO),
+        .requiredWrite = componentMaskMake(COMPONENT_TYPE_BAR),
+        .excluded = {0},
+    };
+    EcsSystemID testSystem = createSystem(scene, testSelection, SYSTEM_EXECUTE_ASYNC, exampleSystemProcess, NULL);
+
+    sceneSetSystemsOrder(scene, 1, &testSystem);
+
     Entity foo = entityCreate(scene);
     Entity bar = entityCreate(scene);
 
     entityAddComponent(scene, foo, COMPONENT_TYPE_FOO, NULL, 0);
+    entityAddComponent(scene, foo, COMPONENT_TYPE_BAR, NULL, 0);
     entityAddComponent(scene, bar, COMPONENT_TYPE_BAR, NULL, 0);
+
+    for(uint32 i = 0; i < 25; i++){
+        Entity e = entityCreate(scene);
+        entityAddComponent(scene, e, COMPONENT_TYPE_FOO, NULL, 0);
+        entityAddComponent(scene, e, COMPONENT_TYPE_BAR, NULL, 0);
+    }
 
     //entityRemoveComponent(scene, a, COMPONENT_TYPE_FOO);
     //entityRemoveComponentType(scene, a, COMPONENT_TYPE_FOO);
@@ -74,26 +98,28 @@ bool8 initialize(struct Application* app){
 
     sceneApply(scene);
 
+    
     avLog(AV_DEBUG, "Entity %x has %u foo components", foo, entityHasComponent(scene, foo, COMPONENT_TYPE_FOO));
+    
+    sceneRunSystems(scene);
+    // JobFence fence; 
+    // jobFenceCreate(&fence);
 
-    JobFence fence; 
-    jobFenceCreate(&fence);
+    // JobBatchDescription batch = {
+    //     .size = 4096,
+    //     .entry = exampleJob,
+    //     .flags.priority = JOB_PRIORITY_MAX,
+    // };
+    // JobBatchID id = submitJobBatch(&batch, fence);
+    // //wait untill id is already completed;
+    // jobFenceWait(fence);
 
-    JobBatchDescription batch = {
-        .size = 4096,
-        .entry = exampleJob,
-        .flags.priority = JOB_PRIORITY_MAX,
-    };
-    JobBatchID id = submitJobBatch(&batch, fence);
-    //wait untill id is already completed;
-    jobFenceWait(fence);
+    // //JobBatchID id2 = submitJobBatch(&batch, NULL);
+    // JobBatchID ids[2] = {id, 0};
+    // submitJobBatchWithDependencies(&batch, 1, ids, NULL);
 
-    //JobBatchID id2 = submitJobBatch(&batch, NULL);
-    JobBatchID ids[2] = {id, 0};
-    submitJobBatchWithDependencies(&batch, 1, ids, NULL);
-
-    //jobFenceWait(fence);
-    jobFenceDestroy(fence);
+    // //jobFenceWait(fence);
+    // jobFenceDestroy(fence);
 
 
 

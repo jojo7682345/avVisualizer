@@ -87,6 +87,7 @@ AV_API void* _darrayInsertAt(void* array, uint64 index, void* value_ptr);
 #define darrayCreateWithAllocator(type, allocator) \
     _darrayCreate(DARRAY_DEFAULT_CAPACITY, sizeof(type), 0, allocator, __LINE__, __func__, __FILE__)
 
+    
 #define darrayCreateSized(type, size) \
     _darrayCreate((size), sizeof(type), (size), 0, __LINE__, __func__, __FILE__)
 
@@ -110,6 +111,10 @@ AV_API void* _darrayInsertAt(void* array, uint64 index, void* value_ptr);
  */
 #define darrayReserveWithAllocator(type, capacity, allocator) \
     _darrayCreate(capacity, sizeof(type), 0, allocator, __LINE__, __func__, __FILE__)
+
+
+#define darrayResize(array) \
+    array = _darrayResize(array);
 
 /**
  * @brief Destroys the provided array, freeing any memory allocated by it.

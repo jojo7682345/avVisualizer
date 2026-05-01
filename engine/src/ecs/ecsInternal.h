@@ -79,43 +79,16 @@ typedef struct EntityType {
     GenericList systems;
 }EntityType;
 
-typedef struct SelectionAccessCriteria {
-    ComponentMask requiredRead; // entities must contain
-    ComponentMask requiredWrite; // entities must contain
-    ComponentMask excluded; // entities must not contain (internally checked)
-} SelectionAccessCriteria;
-
-typedef enum SystemExecution {
-    SYSTEM_EXECUTE_ASYNC,
-    SYSTEM_EXECUTE_SEMI_SYNCHRONOUS,
-    SYSTEM_EXECUTE_SYNCHRONOUS
-} SystemExecution;
-
-typedef struct ComponentAccessor{
-    void* arrays[MAX_COMPONENT_COUNT];
-} ComponentAccessor;
-
-typedef struct SystemChunk {
-    uint32 chunkId;
-    uint32 entityCount;
-    Entity* entities;
-    ComponentMask components;
-    ComponentAccessor accessor;
-} SystemChunk;
-
-typedef void (*SystemProcessFn)(void* ctx, uint32 entityCount, Entity* entities, ComponentAccessor* accessor);
-// all submited jobBathces must use the provided fence (dependencies may be used)
-typedef void (*SystemDispatchFn)(void* ctx, SystemProcessFn process, uint32 chunkCount, SystemChunk* chunks, JobFence fence);
-
-typedef uint32 EcsSystemID;
 
 typedef struct System{
+    Scene scene;
     GenericList entityTypes;
     SelectionAccessCriteria selection;
     SystemExecution execution;
     SystemProcessFn process;
     SystemDispatchFn dispatchOverride;
     void* ctx;
+    bool8 enabled;
 } System;
 
 
@@ -139,10 +112,15 @@ struct Scene {
     ListPool pool;
 
     System* systems;
+    SystemChunk* systemChunkMem; //darray
+    EcsSystemID* systemOrder;
 };
 
 
 bool32 isQuerrySelected(SelectionAccessCriteria criteria, ComponentMask mask);
+void registerNewSystem(Scene scene, EcsSystemID id);
+void unregisterSystemFromEntityTypes(Scene scene, EcsSystemID id);
+EntityChunk* getChunk(uint32 chunkID);
 
 uint32 getComponentSize(ComponentType component);
 ComponentConstructor getComponentConstructor(ComponentType component);
@@ -161,3 +139,5 @@ EntityChunk* getLocalEntityChunk(LocalEntity localEntity);
 uint32 getLocalEntityLocalIndex(LocalEntity localEntity);
 EntityType* getEntityType(Scene scene, EntityTypeID type);
 uint32 getComponentIndex(EntityType* type, ComponentType component);
+
+void destroySystemFromPtr(Scene scene, System* sys);

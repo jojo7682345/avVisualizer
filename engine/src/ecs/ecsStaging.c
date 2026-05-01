@@ -158,6 +158,7 @@ static void growAndInsertCommand(CommandBuffer* buf, CommandList* list, Command 
         newMem[0] = cmd;
         list->commands = newOffset;
         list->count = 1;
+        list->capacity = 0;
         return;
     }
     Command* oldMem = &buf->commandMem[list->commands];
@@ -183,11 +184,11 @@ static uint32 findInsertIndex(CommandBuffer* buf, CommandList* list, Command cmd
     uint32 first = 0;
     uint32 last = list->count - 1;
     while(first <= last){
-        uint32 mid = first + (first + last)>>1;
+        uint32 mid = ((first + last)>>1);
         if(base[mid].entityId <= cmd.entityId){
             first = mid + 1;
         }else {
-            last = mid;
+            last = mid - 1;
         }
     }
     return first;

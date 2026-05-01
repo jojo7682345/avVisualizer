@@ -415,11 +415,12 @@ static bool32 runJob(JobID job, JobInstance instance, JobBatchDescription batch,
     switch(control.ret){
         default:
         case JOB_ERROR:
+        case JOB_EXIT_UNDEFINED:
         case JOB_STATE_OVERRUN:
             avFatal("error while running job");
             freeJob(job);
             return true;
-        case JOB_EXIT:
+        case JOB_EXIT_NORMAL:
             //avLog(AV_DEBUG_SUCCESS, "Job exited successfully");
             freeJob(job);
             return true;
@@ -536,6 +537,13 @@ AV_API void jobFenceCreate(JobFence* fence){
     avMemset(*fence, 0, sizeof(struct JobFence));
     atomic_store(&(*fence)->workLeft, 0); 
 }
+
+AV_API void jobFenceInitRaw(JobFence* fence, void* mem){
+    avMemset(mem, 0, sizeof(struct JobFence));
+    *fence = mem;
+    atomic_store(&(*fence)->workLeft, 0); 
+}
+
 AV_API void jobFenceDestroy(JobFence fence){
     if(avThreadGetID() != AV_MAIN_THREAD_ID){
         avError("Can only destroy fence from main thread");
@@ -552,6 +560,9 @@ static void attachWorkToFence(JobFence fence){
 }
 
 AV_API JobBatchID submitJobBatch(JobBatchDescription* batch, JobFence fence){
+    if(batch->size==0){
+        return JOB_BATCH_NONE;
+    }
     if(fence != NULL){
         if(avThreadGetID() != AV_MAIN_THREAD_ID){
             avError("Tried to submit job batch with fence from worker thread");
@@ -583,6 +594,12 @@ JobBatchID submitToMainQueue(JobPriority priority, JobBatchID id){
 }
 
 AV_API JobBatchID submitJobBatchWithDependencies(JobBatchDescription* batch, uint32 dependencyCount, JobBatchID* dependencies, JobFence fence){
+    if(batch->size==0){
+        return JOB_BATCH_NONE;
+    }
+    if(dependencyCount==0){
+        return submitJobBatch(batch, fence);
+    }
     if(fence != NULL){
         if(avThreadGetID() != AV_MAIN_THREAD_ID){
             avError("Tried to submit job batch with fence from worker thread");

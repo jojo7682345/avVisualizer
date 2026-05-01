@@ -145,7 +145,7 @@ void avAssertEx(bool32 assert, const char* expression, uint64 line,  const char*
 #define avInfo(fmt, ...) \
     avLog(AV_INFO, fmt __VA_OPT__(,) __VA_ARGS__)
 #define avWarn(fmt, ...) \
-    avLog(AV_INFO, fmt __VA_OPT__(,) __VA_ARGS__)
+    avLog(AV_WARNING, fmt __VA_OPT__(,) __VA_ARGS__)
 #define avError(fmt, ...) \
     avLog(AV_ERROR, fmt __VA_OPT__(,) __VA_ARGS__)
 #define avFatal(fmt, ...) \

@@ -41,10 +41,11 @@ typedef struct JobContext {
 } JobContext;
 
 typedef enum JobControlReturn {
-    JOB_ERROR,
-    JOB_EXIT,
+    JOB_EXIT_UNDEFINED,
+    JOB_EXIT_NORMAL,
     JOB_YIELD,
     JOB_STATE_OVERRUN,
+    JOB_ERROR,
 } JobControlReturn;
 
 typedef struct JobControl {
@@ -71,8 +72,8 @@ typedef struct JobBatchDescription {
     uint32 inputOffset;
     uint32 outputStride;
     uint32 outputOffset;
-    byte* inputData;
-    byte* outputData;
+    void* inputData;
+    void* outputData;
     JobEntry entry;
     JobBatchCallback onComplete;
     JobFence fence;
@@ -86,13 +87,13 @@ typedef struct JobSystemConfig {
 #define JOB_STATE_SIZE 4096
 #define JOB_RESULT_BUFFER_SIZE 1024
 
-#define JOB_START JobControl __job_control = {.ret=JOB_ERROR, }; switch(context->exec.section){ case 0:{
+#define JOB_START JobControl __job_control = {.ret=JOB_EXIT_UNDEFINED, }; switch(context->exec.section){ case 0:{
 
 #define JOB_SECTION(sectionNum) if(atomic_load_explicit(&context->shouldYield, memory_order_relaxed)) {__job_control.ret = JOB_YIELD;  __job_control.nextSection=context->exec.section+1; break;} } case (sectionNum):{
 
-#define JOB_END break; } default: __job_control.ret = JOB_EXIT; break; } return __job_control;
+#define JOB_END break; } default: __job_control.ret = JOB_EXIT_NORMAL; break; } return __job_control;
 
-#define JOB_EXIT() do{ return (JobControl){.ret=JOB_EXIT}; } while(0)
+#define JOB_EXIT() do{ return (JobControl){.ret=JOB_EXIT_NORMAL}; } while(0)
 
 //#define JOB_LOCAL(type, name) type* name = (type*)context->state; context->state += sizeof(type); context->stateSize -= sizeof(type); if(context->state + sizeof(type) > context->stateSize) {return (JobControl){.ret=JOB_STATE_OVERRUN}; }
 
@@ -130,6 +131,9 @@ AV_API void jobSystemDeinitialize(void* statePtr);
 AV_API void jobFenceCreate(JobFence* fence);
 AV_API void jobFenceDestroy(JobFence fence);
 AV_API void jobFenceWait(JobFence fence);
+
+#define JOB_FENCE_MEMORY_REQUIREMENT 4
+AV_API void jobFenceInitRaw(JobFence* fence, void* mem);
 
 AV_API JobBatchID submitJobBatch(JobBatchDescription* batch, JobFence fence);
 AV_API JobBatchID submitJobBatchWithDependencies(JobBatchDescription* batch, uint32 dependencyCount, JobBatchID* dependencies, JobFence fence);
