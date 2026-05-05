@@ -189,7 +189,7 @@ void onBatchComplete(struct JobBatchPoolSlot* slot){
     uint32 index = (uint32)(slot - jobBatchPool.slots);
     uint32 generation = atomic_load_explicit(&slot->generation, memory_order_relaxed);
     union JobBatchReferenceSlot ref = (union JobBatchReferenceSlot){.generation=generation, .identifier=index};
-    avDebug("JobBatch %u:%u is complete", ref.generation, ref.identifier);
+    //avDebug("JobBatch %u:%u is complete", ref.generation, ref.identifier);
     if(slot->batch.fence){
         atomic_fetch_sub(&slot->batch.fence->workLeft, 1);
     }

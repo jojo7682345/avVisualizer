@@ -101,4 +101,4 @@ void destroySystem(Scene scene, EcsSystemID system);
 
 
 // returns batch id of last running jobBatch, and registers everything to the fence
-JobBatchID sceneRunSystems(Scene scene, JobFence fence);
+void sceneRunSystems(Scene scene, JobFence fence);

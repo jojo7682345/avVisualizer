@@ -331,7 +331,7 @@ static uint32 createChunk(EntityType* type){
         uint32 size = getComponentSize(component);
         bool32 isArray = false;
         chunk->components[component] = (Component) { avAllocate((size!=0 ? size*CHUNK_CAPACITY : 1), "") };
-        avDebug("Alloc %u", chunkID);
+        //avDebug("Alloc %u", chunkID);
         avMemset(chunk->components[component], 0, size);
     }
     chunk->count = 0;
@@ -366,7 +366,7 @@ static void destroyChunk(EntityType* type, uint32 chunkID){
         for(uint32 i = 0; i < chunk->count; i++){
             destroyComponent(type->scene, chunk->entities[i], (byte*)chunk->components[component] + size*i, component);
         }
-        avDebug("Dealloc %u", chunkID);
+        //avDebug("Dealloc %u", chunkID);
         avFree(chunk->components[component]);
     }
 

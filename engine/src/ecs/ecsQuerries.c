@@ -136,7 +136,7 @@ static inline void collectDependencies(uint32* dependencyCount, JobBatchID* depe
     }
 }
 
-JobBatchID sceneRunSystems(Scene scene, JobFence systemFence, uint32* jobBatchCount, JobBatchID* dependencies){
+void sceneRunSystems(Scene scene, JobFence systemFence){
 
     uint32 systemCount = darrayLength(scene->systemOrder);
     if(systemCount == 0) return;

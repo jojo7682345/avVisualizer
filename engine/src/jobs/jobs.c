@@ -90,36 +90,6 @@ AV_API void jobSystemDeinitialize(void* statePtr){
     }
 }
 
-// JobInstancePool -> single job instances
-// JobBatchPool -> job batches
-
-
-// main thread has per priority queue
-
-// worker thread has local per priority queue
-
-// worker thread:
-// 1: checks local queue for highest priority
-// 2: checks global queue for highest priority
-// 3: checks other threads for highest priority (stealing)
-// 4: take highest priority from global queue
-// 5: repeat for lower priorities
-
-// worker thread (job yields):
-// 1: checks global thread for highest priorty
-// 1a: checks for priority upto priority of yielding job
-// 2: if higher priority job found, take it
-// 3: if no higher priority job, push yielding job to end of local queue
-
-// submiting jobs:
-// jobs are submitted in batches in global queue
-// all jobs of a batch are same priority
-// once jobs move to local queues they are split up into single jobs
-
-// stealing:
-// stealing jobs from threads is allowed up to 2 remaining jobs
-// 
-
 JobID allocateJob(JobInstance* instance){
     avRWLockReadLock(jobInstancePool.lock);
     uint32 index = atomic_fetch_add(&jobInstancePool.jobCount, 1);
@@ -365,10 +335,10 @@ JobID selectJob(WorkerThreadID threadId, JobQueue* globalQueue, LocalJobQueue* l
     return job;
 }
 
-JobID selectJobForMainThread(uint32* stealIndex, JobPriority* priorityPtr){
+JobID selectJobForMainThread(uint32* stealIndex, JobPriority* priorityPtr, JobPriority lowestPriority){
     JobPriority priority = JOB_PRIORITY_MAX;
     JobID job = JOB_NONE;
-    for(; priority <= JOB_PRIORITY_MIN; priority++){
+    for(; priority <= lowestPriority; priority++){
         job = atomic_exchange(&state->exchange[priority], JOB_NONE);
         if(job!=JOB_NONE) break;
         job = stealJobFromOtherThreadsLocalQueue((uint32)-1, stealIndex, priority);
@@ -467,7 +437,7 @@ AV_API void jobFenceWait(JobFence fence){
     while(atomic_load(&fence->workLeft)!=0){
         if(job==JOB_NONE){
             priority = JOB_PRIORITY_MAX;
-            job = selectJobForMainThread(&stealIndex, &priority);
+            job = selectJobForMainThread(&stealIndex, &priority, JOB_PRIORITY_MEDIUM);
             if(job==JOB_NONE){
                 avThreadYield();
                 continue;

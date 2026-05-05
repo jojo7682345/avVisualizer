@@ -1,6 +1,7 @@
 #include <entry.h>
 #include <ecs/ecs.h>
 #include <jobs/jobs.h>
+#include <jobs/ioRequests.h>
 
 extern bool8 renderFrameCpp(struct Application*);
 
@@ -43,9 +44,9 @@ volatile uint32 completedWork[12] = {0, 0};
 #include <AvUtils/avThreading.h>
 JobControl exampleJob(byte* input, uint32 inputSize, byte* output, uint32 outputSize, JobContext* context){
     //avDebug("Hello from worker thread %u", context->threadId);
-    // for(uint32 i = 0; i < 10000000; i++){
-    // }
-    avThreadSleep(10);
+    for(uint32 i = 0; i < 10000000; i++){
+    }
+    //avThreadSleep(10);
     completedWork[context->threadId]++;
     //avDebug("Thread %u completed %u jobs", context->threadId, completedWork[context->threadId]);
     JOB_EXIT();
@@ -58,6 +59,16 @@ JobControl exampleSystemProcess(Scene scene, void* ctx, uint32 entityCount, cons
     }
     JOB_EXIT();
 } 
+
+JobControl exampleIoProcess(const void *data, uint64 dataSize, void *ctx, JobContext *context) {
+    avDebug("Loaded %llu bytes", dataSize);
+    //avDebug("%s", data);
+    JOB_EXIT();
+}
+
+void exampleIoComplete(IoResult result, const void* data, uint64 dataSize, void* ctx){
+    avDebug("Completed with result %u", result);
+}
 
 bool8 initialize(struct Application* app){
     initializeCpp(app);
@@ -85,11 +96,11 @@ bool8 initialize(struct Application* app){
     entityAddComponent(scene, foo, COMPONENT_TYPE_BAR, NULL, 0);
     entityAddComponent(scene, bar, COMPONENT_TYPE_BAR, NULL, 0);
 
-    for(uint32 i = 0; i < 25; i++){
-        Entity e = entityCreate(scene);
-        entityAddComponent(scene, e, COMPONENT_TYPE_FOO, NULL, 0);
-        entityAddComponent(scene, e, COMPONENT_TYPE_BAR, NULL, 0);
-    }
+    // for(uint32 i = 0; i < 25; i++){
+    //     Entity e = entityCreate(scene);
+    //     entityAddComponent(scene, e, COMPONENT_TYPE_FOO, NULL, 0);
+    //     entityAddComponent(scene, e, COMPONENT_TYPE_BAR, NULL, 0);
+    // }
 
     //entityRemoveComponent(scene, a, COMPONENT_TYPE_FOO);
     //entityRemoveComponentType(scene, a, COMPONENT_TYPE_FOO);
@@ -101,25 +112,28 @@ bool8 initialize(struct Application* app){
     
     avLog(AV_DEBUG, "Entity %x has %u foo components", foo, entityHasComponent(scene, foo, COMPONENT_TYPE_FOO));
     
-    sceneRunSystems(scene);
-    // JobFence fence; 
-    // jobFenceCreate(&fence);
+    sceneRunSystems(scene, NULL);
 
-    // JobBatchDescription batch = {
-    //     .size = 4096,
-    //     .entry = exampleJob,
-    //     .flags.priority = JOB_PRIORITY_MAX,
-    // };
-    // JobBatchID id = submitJobBatch(&batch, fence);
-    // //wait untill id is already completed;
-    // jobFenceWait(fence);
+    submitIoRead("./avVisualizer.project", exampleIoProcess, exampleIoComplete, NULL); // wastefull
+    
+    JobFence fence; 
+    jobFenceCreate(&fence);
 
-    // //JobBatchID id2 = submitJobBatch(&batch, NULL);
-    // JobBatchID ids[2] = {id, 0};
-    // submitJobBatchWithDependencies(&batch, 1, ids, NULL);
+    JobBatchDescription batch = {
+        .size = 4096,
+        .entry = exampleJob,
+        .flags.priority = JOB_PRIORITY_MAX,
+    };
+    JobBatchID id = submitJobBatch(&batch, fence);
+    //wait untill id is already completed;
+    jobFenceWait(fence);
 
-    // //jobFenceWait(fence);
-    // jobFenceDestroy(fence);
+    //JobBatchID id2 = submitJobBatch(&batch, NULL);
+    JobBatchID ids[2] = {id, 0};
+    submitJobBatchWithDependencies(&batch, 1, ids, NULL);
+
+    //jobFenceWait(fence);
+    jobFenceDestroy(fence);
 
 
 

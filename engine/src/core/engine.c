@@ -5,6 +5,7 @@
 #include "platform/platform.h"
 #include "renderer/renderer.h"
 #include "jobs/jobs.h"
+#include "jobs/ioRequests.h"
 
 #include <AvUtils/avLogging.h>
 #include <AvUtils/avMemory.h>
@@ -61,6 +62,7 @@ void* inputMem = NULL;
 void* platformMem = NULL;
 void* rendererMem = NULL;
 void* jobsystemMem = NULL;
+void* iosystemMem = NULL;
 bool8 systemsInitialize(Application* game_inst){
     EventSystemConfig eventConfig = {0};
     eventConfig.maxIDs = 0xffff;
@@ -104,11 +106,20 @@ bool8 systemsInitialize(Application* game_inst){
     rendererStartup(&memSize, rendererMem, &rendererConfig);
 
     JobSystemConfig jobsystemConfig = {
-        .maxWorkerThreads = 11,
+        .maxWorkerThreads = 10,
     };
     jobSystemInitialize(&memSize, 0, &jobsystemConfig);
     jobsystemMem = avAllocate(memSize, "");
     jobSystemInitialize(&memSize, jobsystemMem, &jobsystemConfig);
+
+    IoSystemConfig ioSystemConfig = {
+        .concurrentRequests = 16,
+        .inlineBufferSize = 256 * 1024, // 256 KB
+        .threadCount = 1,
+    };
+    initializeIoSystem(&memSize, 0, &ioSystemConfig);
+    iosystemMem = avAllocate(memSize, "");
+    initializeIoSystem(&memSize, iosystemMem, &ioSystemConfig);
 }
 
 void systemsUninitialize(){
@@ -122,6 +133,8 @@ void systemsUninitialize(){
     avFree(rendererMem);
     jobSystemDeinitialize(jobsystemMem);
     avFree(jobsystemMem);
+    deinitializeIoSystem(iosystemMem);
+    avFree(iosystemMem);
 }
 
 bool8 engine_run(Application* game_inst) {
@@ -208,6 +221,8 @@ bool8 engine_run(Application* game_inst) {
             //     engineState->is_running = false;
             //     break;
             // }
+
+            ioSystemUpdate();
 
             // Figure out how long the frame took and, if below
             double frame_end_time = platformGetAbsoluteTime();
