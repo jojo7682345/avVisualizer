@@ -1,5 +1,5 @@
-#include "core/input.h"
-#include "core/event.h"
+#include "../input.h"
+#include "../event.h"
 #include "engine.h"
 #include <AvUtils/avMemory.h>
 

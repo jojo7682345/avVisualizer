@@ -1,11 +1,12 @@
-#include "jobs.h"
-#include "jobBatchPool.h"
-#define AV_LOG_CATEGORY "job system" 
-#include "logging.h"
+#include "../jobs.h"
 
 #include <stdatomic.h>
 #include <AvUtils/threading/avRwLock.h>
 #include <AvUtils/avMemory.h>
+
+#include "jobBatchPool.h"
+#define AV_LOG_CATEGORY "job system" 
+#include "logging.h"
 
 union JobBatchReferenceSlot {
     JobBatchID id;

@@ -1,14 +1,16 @@
 #include "../renderer.h"
-#include "defines.h"
-#include "logging.h"
-#include "platform/platform.h"
-#include "utils/vector.h"
+
 #include <AvUtils/avMath.h>
 #include <vulkan/vulkan.h>
-#include "containers/darray.h"
 #include <AvUtils/avString.h>
 #include <AvUtils/avMemory.h>
-#include "utils/matrix.h"
+
+#include "defines.h"
+#include "core/platform.h"
+#include "core/utils/vector.h"
+#include "core/utils/matrix.h"
+#include "containers/darray.h"
+#include "logging.h"
 
 typedef struct RendererState {
     VkInstance instance;

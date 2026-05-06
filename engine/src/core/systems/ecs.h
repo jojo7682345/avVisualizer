@@ -2,8 +2,8 @@
 
 #include "defines.h"
 
-#include "componentMask.h"
-#include "jobs/jobs.h"
+#include "ecsSystem/componentMask.h"
+#include "core/systems/jobs.h"
 
 typedef uint32 Entity;
 typedef uint32 EntityTypeID;

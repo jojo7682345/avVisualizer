@@ -1,14 +1,15 @@
 #pragma once
-#include "ecs.h"
-#include "ecsStaging.h"
+#include "../ecs.h"
+#include "../jobs.h"
+
+#include <stdatomic.h>
 #include <AvUtils/avMemory.h>
 #include <AvUtils/threading/avRwLock.h>
 #include <AvUtils/threading/avThread.h>
 #include <AvUtils/memory/avAllocator.h>
-#include "logging.h"
-#include "jobs/jobs.h"
-#include <stdatomic.h>
 
+#include "logging.h"
+#include "ecsStaging.h"
 #include "containers/listpool.h"
 
 

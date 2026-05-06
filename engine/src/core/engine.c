@@ -1,14 +1,15 @@
 #include "engine.h"
-#include "core/event.h"
-#include "core/clock.h"
-#include "core/input.h"
-#include "platform/platform.h"
-#include "renderer/renderer.h"
-#include "jobs/jobs.h"
-#include "jobs/ioRequests.h"
 
 #include <AvUtils/avLogging.h>
 #include <AvUtils/avMemory.h>
+
+#include "platform.h"
+#include "core/systems/event.h"
+#include "core/systems/input.h"
+#include "core/systems/io.h"
+#include "core/systems/jobs.h"
+#include "core/utils/clock.h"
+#include "renderer/renderer.h"
 
 typedef struct engine_state_t {
     Application* game_inst;

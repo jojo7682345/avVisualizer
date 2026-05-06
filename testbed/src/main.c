@@ -1,7 +1,7 @@
 #include <entry.h>
-#include <ecs/ecs.h>
-#include <jobs/jobs.h>
-#include <jobs/ioRequests.h>
+#include <core/systems/ecs.h>
+#include <core/systems/jobs.h>
+#include <core/systems/io.h>
 
 extern bool8 renderFrameCpp(struct Application*);
 

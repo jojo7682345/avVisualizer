@@ -1,14 +1,14 @@
-#include "platform.h"
-#include "core/input.h"
-#include "core/event.h"
-#include "engine.h"
+#include "core/platform.h"
 
-#include <AvUtils/avLogging.h>
+#include "core/systems/input.h"
+#include "core/systems/event.h"
+#include "engine.h"
 
 #define WIN32_LEAN_AND_MEAN
 #include <stdlib.h>
 #include <windows.h>
 #include <windowsx.h>  // param input extraction
+#include <AvUtils/avLogging.h>
 
 typedef struct Win32HandleInfo {
     HINSTANCE instance;

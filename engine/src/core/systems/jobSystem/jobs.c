@@ -1,9 +1,11 @@
-#include "jobs.h"
+#include "../jobs.h"
+
 #include "jobQueue.h"
+#include "jobsInternal.h"
+
 #define AV_LOG_CATEGORY "job system" 
 #include "logging.h"
 
-#include "jobsInternal.h"
 
 JobInstancePool jobInstancePool = {0};
 JobSystemState* state = NULL;

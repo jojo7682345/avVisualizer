@@ -1,17 +1,18 @@
-#include "ioRequests.h"
-#include "containers/queues/mpmcQueue.h"
+#include "../io.h"
+
+#include <unistd.h>
+#include <fcntl.h>
+#include <errno.h>
 #include <AvUtils/avThreading.h>
 #include <AvUtils/avMemory.h>
 #include <AvUtils/avString.h>
 #include <AvUtils/threading/avSemaphore.h>
 #include <AvUtils/threading/avRwLock.h>
 
+#include "containers/queues/mpmcQueue.h"
 #define AV_LOG_CATEGORY "IO"
 #include "logging.h"
 
-#include <unistd.h>
-#include <fcntl.h>
-#include <errno.h>
 
 static unsigned int nextPowerOf2(unsigned int n)
 {

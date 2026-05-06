@@ -1,5 +1,5 @@
 #pragma once
-#include "jobs.h"
+#include "../jobs.h"
 
 typedef struct JobSlot {
     _Atomic uint32 sequence;

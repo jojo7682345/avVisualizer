@@ -3,9 +3,10 @@
 #include <stdatomic.h>
 #include <AvUtils/avThreading.h>
 #include <AvUtils/threading/avConditionVariable.h>
-#include "platform/platform.h"
 #include <AvUtils/avMemory.h>
 #include <AvUtils/avString.h>
+
+#include "core/platform/platform.h"
 
 typedef struct AvLogQueue {
     AvLogMessage* buffer;

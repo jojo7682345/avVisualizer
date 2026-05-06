@@ -1,6 +1,6 @@
 #include "clock.h"
 
-#include "platform/platform.h"
+#include "core/platform/platform.h"
 
 void clockUpdate(Clock* clock) {
     if (clock->startTime != 0) {
