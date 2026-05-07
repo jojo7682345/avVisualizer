@@ -8,7 +8,7 @@ typedef struct IoSystemConfig {
     uint32 inlineBufferSize;
 } IoSystemConfig;
 
-bool32 initializeIoSystem(uint64* memoryRequirements, void* statePtr, void* configPtr);
+bool8 initializeIoSystem(uint64* memoryRequirements, void* statePtr, void* configPtr);
 void deinitializeIoSystem(void* statePtr);
 
 void ioSystemUpdate();

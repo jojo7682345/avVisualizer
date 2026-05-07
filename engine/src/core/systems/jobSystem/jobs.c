@@ -11,7 +11,7 @@ JobInstancePool jobInstancePool = {0};
 JobSystemState* state = NULL;
 
 int32 workerThreadEntry(byte* data, uint64 size);
-AV_API bool32 jobSystemInitialize(uint64* memoryRequirement, void* statePtr, void* configPtr){
+AV_API bool8 jobSystemInitialize(uint64* memoryRequirement, void* statePtr, void* configPtr){
     *memoryRequirement = sizeof(JobSystemState);
     if(statePtr==NULL) return true;
     state = (JobSystemState*) statePtr;

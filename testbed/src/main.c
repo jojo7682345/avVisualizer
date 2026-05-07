@@ -3,9 +3,9 @@
 #include <core/systems/jobs.h>
 #include <core/systems/io.h>
 
-extern bool8 renderFrameCpp(struct Application*);
+extern bool8 renderFrameCpp(struct EngineConfig*);
 
-extern bool8 initializeCpp(struct Application*);
+extern bool8 initializeCpp(struct EngineConfig*);
 
 Scene scene = {0};
 
@@ -70,7 +70,7 @@ void exampleIoComplete(IoResult result, const void* data, uint64 dataSize, void*
     avDebug("Completed with result %u", result);
 }
 
-bool8 initialize(struct Application* app){
+bool8 initialize(struct EngineConfig* app){
     initializeCpp(app);
 
     // initialize
@@ -140,25 +140,12 @@ bool8 initialize(struct Application* app){
     return true;
 }
 
-bool8 renderFrame(struct Application* app){
-    renderFrameCpp(app);
 
-    return true;
-}
-
-bool8 update(struct Application* app_inst){
-    return true;
-}
-
-bool8 prepareFrame(struct Application* app_inst){
-    return true;
-}
-
-void onResize(struct Application* app_inst, uint32 width, uint32 height){
+void onResize(struct EngineConfig* app_inst, uint32 width, uint32 height){
 
 }
 
-void shutdown(struct Application* app_inst){
+void shutdown(struct EngineConfig* app_inst){
     sceneDestroy(scene);
 }
 
@@ -176,7 +163,7 @@ AvResult disabledLogMessages[] = {
 uint disabledLogMessageCount = sizeof(disabledLogMessages) / sizeof(AvResult);
 
 // Define the function to create a game
-bool8 create_application(Application* out_application) {
+bool8 configureEngine(EngineConfig* out_application) {
 
     // AvLogSettings logSettings = avLogSettingsDefault;
 	// logSettings.printSuccess = false;
@@ -202,23 +189,8 @@ bool8 create_application(Application* out_application) {
     out_application->appConfig.startHeight = 720;
     out_application->appConfig.name = "AvVisualizer TestBed!";
 
-
-    out_application->engineState = 0;
-    out_application->state = 0;
-
     out_application->initialize = initialize;
-    out_application->update = update;
-    out_application->prepareFrame = prepareFrame;
-    out_application->renderFrame = renderFrame;
-    out_application->on_resize = onResize;
+    out_application->onResize = onResize;
     out_application->shutdown = shutdown;
-
-
-    return true;
-}
-
-bool8 initialize_application(Application* app) {
-
-
     return true;
 }

@@ -39,7 +39,7 @@ void clock_setup(void) {
 LRESULT CALLBACK win32ProcessMessage(HWND hwnd, uint32 msg, WPARAM w_param, LPARAM l_param);
 
 bool8 platformSystemStartup(uint64 *memoryRequirement, void *state_ptr, void *config) {
-    platformSystemConfig *typedConfig = (platformSystemConfig *)config;
+    PlatformConfig *typedConfig = (PlatformConfig *)config;
     *memoryRequirement = sizeof(PlatformState);
     if (state_ptr == 0) {
         return true;

@@ -11,8 +11,8 @@
 #include "core/utils/clock.h"
 #include "renderer/renderer.h"
 
-typedef struct engine_state_t {
-    Application* game_inst;
+typedef struct EngineState {
+    EngineConfig config;
     bool8 is_running;
     bool8 is_suspended;
     int16 width;
@@ -21,26 +21,32 @@ typedef struct engine_state_t {
     double last_time;
     uint64 frameIndex;
 
+    void* systemsMemory;
+
     // Indicates if the window is currently being resized.
     //b8 resizing;
     // The current number of frames since the last resize operation.
     // Only set if resizing = true. Otherwise 0.
     //u8 frames_since_resize;
-} engine_state_t;
+} EngineState;
 
-static engine_state_t* engineState;
+static EngineState* engineState;
+
+typedef struct EngineSystem {
+    void* state;
+    bool8 (*initialize)(uint64* memory_requirement, void* statePtr, void* configPtr);
+    void (*uninitialize)(void* state);
+    void* config;
+} EngineSystem;
 
 
-bool8 engine_create(Application* game_inst) {
-    if (game_inst->engineState) {
-        avAssert(0, "engine_create called more than once.");
+bool8 engineInitialize(EngineConfig* config) {
+    if(engineState != NULL){
+        avError("engine already initalized");
         return false;
     }
-
-    // Stand up the engine state.
-    game_inst->engineState = avAllocate(sizeof(engine_state_t), "");
-    engineState = game_inst->engineState;
-    engineState->game_inst = game_inst;
+    engineState = avAllocate(sizeof(EngineState), "");
+    engineState->config = *config;
     engineState->is_running = false;
     engineState->is_suspended = false;
 
@@ -52,221 +58,118 @@ bool8 engine_create(Application* game_inst) {
     avLogInit(&logConfig);
     avLogAddSink(avLogConsoleSink, NULL);
     //if(engineState->game_inst->logSettings) setLogSettings(*engineState->game_inst->logSettings);
-
     return true;
 }
 
-// static void engineOnEvent(uint16 code, void* sender, void* listener_inst, EventContext context);
+static PlatformConfig platformConfig;
+static EventSystemConfig eventConfig;
+static RendererConfig rendererConfig;
+static JobSystemConfig jobsystemConfig;
+static IoSystemConfig ioSystemConfig;
+EngineSystem engineSystems[] = {
+    {.initialize=eventSystemInitialize,     .uninitialize=eventSystemShutdown,      .config=&eventConfig        },
+    {.initialize=inputSystemInitialize,     .uninitialize=inputSystemShutdown,      .config=NULL                }, 
+    {.initialize=platformSystemStartup,     .uninitialize=platformSystemShutdown,   .config=&platformConfig     },
+    //{.initialize=rendererStartup,           .uninitialize=rendererShutdown,         .config=&rendererConfig     },
+    {.initialize=jobSystemInitialize,       .uninitialize=jobSystemDeinitialize,    .config=&jobsystemConfig    },
+    {.initialize=initializeIoSystem,        .uninitialize=deinitializeIoSystem,     .config=&ioSystemConfig     },
+};
 
-void* eventMem = NULL;
-void* inputMem = NULL;
-void* platformMem = NULL;
-void* rendererMem = NULL;
-void* jobsystemMem = NULL;
-void* iosystemMem = NULL;
-bool8 systemsInitialize(Application* game_inst){
-    EventSystemConfig eventConfig = {0};
+bool8 systemsInitialize(EngineConfig* config){
+
     eventConfig.maxIDs = 0xffff;
-    uint64 memSize = 0;
-    eventSystemInitialize(&memSize, 0, &eventConfig);
-    eventMem = avAllocate(memSize, "");
-    eventSystemInitialize(&memSize, eventMem, &eventConfig);
+
+    platformConfig.applicationName = config->appConfig.name;
+    platformConfig.x = config->appConfig.startPosX;
+    platformConfig.y = config->appConfig.startPosY;
+    platformConfig.width = config->appConfig.startWidth;
+    platformConfig.height = config->appConfig.startHeight;
+    
+    engineState->width = config->appConfig.startWidth;
+    engineState->height = config->appConfig.startHeight;
+
+    rendererConfig.appName = config->appConfig.name;
+    rendererConfig.engineName = "AV_VISUALIZER";
+    rendererConfig.appVersion = (Version){0};
+    rendererConfig.engineVersion = (Version){0};
+    rendererConfig.enableValidation = true;
+    rendererConfig.platformState = NULL; //platformMem,
+
+    jobsystemConfig.maxWorkerThreads = 10;
+    
+    ioSystemConfig.concurrentRequests = 16;
+    ioSystemConfig.inlineBufferSize = 256 * 1024; // 256 KB
+    ioSystemConfig.threadCount = 1;
+    
+    
+    uint64 totalMemSize = 0;
+    for(uint32 i = 0; i < sizeof(engineSystems)/sizeof(EngineSystem); i++){
+        uint64 memSize = 0;
+        engineSystems[i].initialize(&memSize, NULL, engineSystems[i].config);
+        totalMemSize += memSize;
+    }
+    engineState->systemsMemory = avAllocate(totalMemSize, "Allocating systems memory");
+    byte* memory = engineState->systemsMemory;
+    for(uint32 i = 0; i < sizeof(engineSystems)/sizeof(EngineSystem); i++){
+        uint64 memSize = 0;
+        engineSystems[i].initialize(&memSize, memory, engineSystems[i].config);
+        engineSystems[i].state = memory;
+        memory += memSize;
+    }
 
     engine_on_event_system_initialized();
-    
-    inputSystemInitialize(&memSize, 0, 0);
-    inputMem = avAllocate(memSize, "");
-    inputSystemInitialize(&memSize, inputMem, 0);
-
-    platformSystemConfig platformSystemConfig = {
-        .applicationName = game_inst->appConfig.name,
-        .x = game_inst->appConfig.startPosX,
-        .y = game_inst->appConfig.startPosY,
-        .width = game_inst->appConfig.startWidth,
-        .height = game_inst->appConfig.startHeight,
-    };
-
-    engineState->width = game_inst->appConfig.startWidth;
-    engineState->height = game_inst->appConfig.startHeight;
-
-    platformSystemStartup(&memSize, 0, &platformSystemConfig);
-    platformMem = avAllocate(memSize, "");
-    platformSystemStartup(&memSize, platformMem, &platformSystemConfig);
-
-    RendererConfig rendererConfig = {
-        .appName = game_inst->appConfig.name,
-        .engineName = "AV_VISUALIZER",
-        .appVersion = 0,
-        .engineVersion = 0,
-        .enableValidation = true,
-        .platformState = platformMem,
-    };
-
-    rendererStartup(&memSize, 0, &rendererConfig);
-    rendererMem = avAllocate(memSize, "");
-    rendererStartup(&memSize, rendererMem, &rendererConfig);
-
-    JobSystemConfig jobsystemConfig = {
-        .maxWorkerThreads = 10,
-    };
-    jobSystemInitialize(&memSize, 0, &jobsystemConfig);
-    jobsystemMem = avAllocate(memSize, "");
-    jobSystemInitialize(&memSize, jobsystemMem, &jobsystemConfig);
-
-    IoSystemConfig ioSystemConfig = {
-        .concurrentRequests = 16,
-        .inlineBufferSize = 256 * 1024, // 256 KB
-        .threadCount = 1,
-    };
-    initializeIoSystem(&memSize, 0, &ioSystemConfig);
-    iosystemMem = avAllocate(memSize, "");
-    initializeIoSystem(&memSize, iosystemMem, &ioSystemConfig);
 }
 
 void systemsUninitialize(){
-    inputSystemShutdown(inputMem);
-    avFree(inputMem);
-    eventSystemShutdown(eventMem);
-    avFree(eventMem);
-    platformSystemShutdown(platformMem);
-    avFree(platformMem);
-    rendererShutdown(rendererMem);
-    avFree(rendererMem);
-    jobSystemDeinitialize(jobsystemMem);
-    avFree(jobsystemMem);
-    deinitializeIoSystem(iosystemMem);
-    avFree(iosystemMem);
+    for(uint32 i = 0; i < sizeof(engineSystems)/sizeof(EngineSystem); i++){
+        engineSystems[i].uninitialize(engineSystems[i].state);
+    }
+    avFree(engineState->systemsMemory);
 }
 
-bool8 engine_run(Application* game_inst) {
+bool8 engineRun(EngineConfig* game_inst){
     engineState->is_running = true;
     clockStart(&engineState->clock);
     clockUpdate(&engineState->clock);
     engineState->last_time = engineState->clock.elapsed;
-    // f64 running_time = 0;
-    // TODO: frame rate lock
-    // u8 frame_count = 0;
-    double target_frame_seconds = 1.0f / 120;
-    double frame_elapsed_time = 0;
-    
+
+    double targetFrameSeconds = 1.0f / 120.0f;
+    double frameElapsedTime = 0;
+
     systemsInitialize(game_inst);
-    
-    // Initialize the game.
-    if (!engineState->game_inst->initialize(engineState->game_inst)) {
-        avAssert(0, "Game failed to initialize.");
+
+    if(!engineState->config.initialize(&engineState->config)){
+        avAssert(0, "Game failed to initialize");
         return false;
     }
 
-    while (engineState->is_running) {
-        if (!platformPumpMessages()) {
+    while(engineState->is_running){
+        if(!platformPumpMessages()){
             engineState->is_running = false;
         }
         eventsDispatch();
-        if (!engineState->is_suspended) {
-            // Update clock and get delta time.
-            clockUpdate(&engineState->clock);
-            double current_time = engineState->clock.elapsed;
-            double delta = (current_time - engineState->last_time);
-            double frame_start_time = platformGetAbsoluteTime();
+        if(engineState->is_suspended) continue;
 
+        clockUpdate(&engineState->clock);
+        double current_time = engineState->clock.elapsed;
+        double delta = (current_time - engineState->last_time);
+        double frame_start_time = platformGetAbsoluteTime();
+
+        ioSystemUpdate();
+
+        
     
-            // if (!renderer_frame_prepare()) {
-            //     // This can also happen not just from a resize above, but also if a renderer flag
-            //     // (such as VSync) changed, which may also require resource recreation. To handle this,
-            //     // Notify the application of a resize event, which it can then pass on to its rendergraph(s)
-            //     // as needed.
-            //     engineState->game_inst->on_resize(engineState->game_inst, engineState->width, engineState->height);
-            //     continue;
-            // }
 
-            if (!engineState->game_inst->update(engineState->game_inst)) {
-                avAssert(0, "Game update failed, shutting down.");
-                engineState->is_running = false;
-                break;
-            }
-
-            // if (!renderer_begin(&engineState->p_frame_data)) {
-            //     KFATAL("Failed to begin renderer. Shutting down.");
-            //     engineState->is_running = false;
-            //     break;
-            // }
-
-            //rendererBeginFrame(engineState->width, engineState->height);
-            
-            // Have the application generate the render packet.
-            bool8 prepare_result = engineState->game_inst->prepareFrame(engineState->game_inst);
-
-            if (!prepare_result) {
-                continue;
-            }
-            extern void startFrame();
-            extern void endFrame();
-            startFrame();
-            // Call the game's render routine.
-            if (!engineState->game_inst->renderFrame(engineState->game_inst)) {
-                avAssert(0, "Game render failed, shutting down.");
-                engineState->is_running = false;
-                break;
-            }
-            endFrame();
-
-            rendererDrawFrame();
-            // End the frame.
-            //renderer_end();
-
-            
-
-            // // Present the frame.
-            // if (!renderer_present()) {
-            //     avAssert(0, "The call to renderer_present failed. This is likely unrecoverable. Shutting down.");
-            //     engineState->is_running = false;
-            //     break;
-            // }
-
-            ioSystemUpdate();
-
-            // Figure out how long the frame took and, if below
-            double frame_end_time = platformGetAbsoluteTime();
-            frame_elapsed_time = frame_end_time - frame_start_time;
-            // running_time += frame_elapsed_time;
-            double remaining_seconds = target_frame_seconds - frame_elapsed_time;
-
-            if (remaining_seconds > 0) {
-                double remaining_ms = (remaining_seconds * 1000);
-
-                // If there is time left, give it back to the OS.
-                double limit_frames = true;
-                if (remaining_ms > 0 && limit_frames) {
-                    platformSleep(remaining_ms - 1);
-                }
-
-                // TODO: frame rate lock
-                // frame_count++;
-            }
-
-            // NOTE: Input update/state copying should always be handled
-            // after any input should be recorded; I.E. before this line.
-            // As a safety, input is the last thing to be updated before
-            // this frame ends.
-            inputUpdate();
-
-            // Update last time
-            engineState->last_time = current_time;
-            engineState->frameIndex++;
-        }
+        // prepare for next frame
+        inputUpdate(); // store current keys pressed to previous keys pressed
+        engineState->last_time = current_time;
+        engineState->frameIndex++;
     }
 
     engineState->is_running = false;
+    engineState->config.shutdown(&engineState->config);
 
-    // Shut down the game.
-    engineState->game_inst->shutdown(engineState->game_inst);
 
-    // Unregister from events.
-    //eventUnregister(EVENT_CODE_APPLICATION_QUIT, 0, engineOnEvent);
-    //unregisterEventSink(EVENT_CODE_APPLICATION_QUIT, 0);
-    //inputSystemShutdown(inputMem);
-
-    //platformSystemShutdown(platformMem);
     systemsUninitialize();
     avFree(engineState);
 
@@ -274,12 +177,13 @@ bool8 engine_run(Application* game_inst) {
     return true;
 }
 
+
 static void engineOnEvent(Event* events, uint32 count) {
     for(uint32 i = 0; i < count; i++){
         Event* event = events+i;
         switch (event->id) {
             case EVENT_CODE_APPLICATION_QUIT: {
-                //KINFO("EVENT_CODE_APPLICATION_QUIT recieved, shutting down.\n");
+                avInfo("EVENT_CODE_APPLICATION_QUIT recieved, shutting down");
                 engineState->is_running = false;
                 event->flags.consumed = 1;
                 continue;
@@ -308,8 +212,8 @@ static void engineOnResized(Event* events, uint32 count){//(uint16 code, void* s
     if(resized){
         engineState->width = width;
         engineState->height = height;
-        engineState->game_inst->on_resize(engineState->game_inst, engineState->width, engineState->height);
-        rendererSignalResize();
+        engineState->config.onResize(&engineState->config, engineState->width, engineState->height);
+        //rendererSignalResize();
     }
 }
 
@@ -317,7 +221,92 @@ void engine_on_event_system_initialized(void) {
     // Register for engine-level events.
     registerEventSink(EVENT_CODE_APPLICATION_QUIT, engineOnEvent);
     registerEventSink(EVENT_CODE_RESIZED, engineOnResized);
-
-
 }
+
+// bool8 engine_run(EngineConfig* game_inst) {
+    //     engineState->is_running = true;
+    //     clockStart(&engineState->clock);
+    //     clockUpdate(&engineState->clock);
+    //     engineState->last_time = engineState->clock.elapsed;
+    //     // f64 running_time = 0;
+    //     // TODO: frame rate lock
+    //     // u8 frame_count = 0;
+    //     double target_frame_seconds = 1.0f / 120;
+    //     double frame_elapsed_time = 0;
+        
+    //     systemsInitialize(game_inst);
+        
+    //     // Initialize the game.
+    //     if (!engineState->game_inst->initialize(engineState->game_inst)) {
+    //         avAssert(0, "Game failed to initialize.");
+    //         return false;
+    //     }
+    
+    //     while (engineState->is_running) {
+    //         if (!platformPumpMessages()) {
+    //             engineState->is_running = false;
+    //         }
+    //         eventsDispatch();
+    //         if (!engineState->is_suspended) {
+    //             // Update clock and get delta time.
+    //             clockUpdate(&engineState->clock);
+    //             double current_time = engineState->clock.elapsed;
+    //             double delta = (current_time - engineState->last_time);
+    //             double frame_start_time = platformGetAbsoluteTime();
+    
+        
+            
+        
+                
+    
+    //             ioSystemUpdate();
+    
+    //             // Figure out how long the frame took and, if below
+    //             double frame_end_time = platformGetAbsoluteTime();
+    //             frame_elapsed_time = frame_end_time - frame_start_time;
+    //             // running_time += frame_elapsed_time;
+    //             double remaining_seconds = target_frame_seconds - frame_elapsed_time;
+    
+    //             if (remaining_seconds > 0) {
+    //                 double remaining_ms = (remaining_seconds * 1000);
+    
+    //                 // If there is time left, give it back to the OS.
+    //                 double limit_frames = true;
+    //                 if (remaining_ms > 0 && limit_frames) {
+    //                     platformSleep(remaining_ms - 1);
+    //                 }
+    
+    //                 // TODO: frame rate lock
+    //                 // frame_count++;
+    //             }
+    
+    //             // NOTE: Input update/state copying should always be handled
+    //             // after any input should be recorded; I.E. before this line.
+    //             // As a safety, input is the last thing to be updated before
+    //             // this frame ends.
+    //             inputUpdate();
+    
+    //             // Update last time
+    //             engineState->last_time = current_time;
+    //             engineState->frameIndex++;
+    //         }
+    //     }
+    
+    //     engineState->is_running = false;
+    
+    //     // Shut down the game.
+    //     engineState->game_inst->shutdown(engineState->game_inst);
+    
+    //     // Unregister from events.
+    //     //eventUnregister(EVENT_CODE_APPLICATION_QUIT, 0, engineOnEvent);
+    //     //unregisterEventSink(EVENT_CODE_APPLICATION_QUIT, 0);
+    //     //inputSystemShutdown(inputMem);
+    
+    //     //platformSystemShutdown(platformMem);
+    //     systemsUninitialize();
+    //     avFree(engineState);
+    
+    //     avLogShutdown();
+    //     return true;
+    // }
 

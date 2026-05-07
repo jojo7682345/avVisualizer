@@ -2,13 +2,13 @@
 
 #include "defines.h"
 
-typedef struct platformSystemConfig {
+typedef struct PlatformConfig {
     const char* applicationName;
     int32 x;
     int32 y;
     int32 width;
     int32 height;
-} platformSystemConfig;
+} PlatformConfig;
 
 /**
  * @brief Performs startup routines within the platform layer. Should be called twice,

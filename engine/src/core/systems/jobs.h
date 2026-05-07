@@ -125,7 +125,7 @@ typedef struct JobSystemConfig {
             }else
 
 
-AV_API bool32 jobSystemInitialize(uint64* memoryRequirement, void* statePtr, void* configPtr);
+AV_API bool8 jobSystemInitialize(uint64* memoryRequirement, void* statePtr, void* configPtr);
 AV_API void jobSystemDeinitialize(void* statePtr);
 
 AV_API void jobFenceCreate(JobFence* fence);

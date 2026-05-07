@@ -144,7 +144,7 @@ void requestPoolFree(IoRequestPool* pool, uint32 index){
 }
 
 static int32 ioThreadEntry(byte*,uint64 index);
-bool32 initializeIoSystem(uint64* memoryRequirements, void* statePtr, void* configPtr){
+bool8 initializeIoSystem(uint64* memoryRequirements, void* statePtr, void* configPtr){
     *memoryRequirements = sizeof(IoState);
     if(statePtr==NULL) return true;
     state = statePtr;

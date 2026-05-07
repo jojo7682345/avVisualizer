@@ -10,9 +10,7 @@
  * @param out_app A pointer which holds the created application object as provided by the consumer.
  * @returns True on successful creation; otherwise false.
  */
-extern bool8 create_application(Application* out_app);
-
-extern bool8 initialize_application(Application* app);
+extern bool8 configureEngine(EngineConfig* out_app);
 
 /**
  * @brief The main entry point of the application.
@@ -20,31 +18,26 @@ extern bool8 initialize_application(Application* app);
  */
 int main(void) {
     // Request the application instance from the application.
-    Application app_inst = {0};
-    if (!create_application(&app_inst)) {
+    EngineConfig config = {0};
+    if (!configureEngine(&config)) {
         avAssert(0,"Could not create application!");
         return -1;
     }
 
     // Ensure the function pointers exist.
-    if (!app_inst.renderFrame || !app_inst.prepareFrame || !app_inst.update || !app_inst.initialize || !app_inst.on_resize) {
+    if (!config.initialize) {
         avAssert(0,"The application's function pointers must be assigned!");
         return -2;
     }
 
     // Initialization.
-    if (!engine_create(&app_inst)) {
+    if (!engineInitialize(&config)) {
         avAssert(0,"Engine failed to create!.");
         return 1;
     }
 
-    if (!initialize_application(&app_inst)) {
-        avAssert(0, "Could not initialize application!");
-        return -1;
-    }
-
     // Begin the engine loop.
-    if (!engine_run(&app_inst)) {
+    if (!engineRun(&config)) {
         avAssert(0, "Application did not shutdown gracefully.");
         return 2;
     }

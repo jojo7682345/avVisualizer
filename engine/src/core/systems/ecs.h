@@ -94,9 +94,6 @@ JobBatchID dispatchChunks(Scene scene, EcsSystemID systemID, uint32 chunkCount, 
 EcsSystemID createSystem(Scene scene, SelectionAccessCriteria selection, SystemExecution execution, SystemProcessFn process, void* ctx);
 EcsSystemID createSystemCustom(Scene scene, SelectionAccessCriteria selection, SystemExecution execution, SystemProcessFn process, SystemDispatchFn dispatchOverride, void* ctx);
 
-void enableSystem(Scene scene, EcsSystemID system, bool32 enable);
-bool32 isSystemEnabled(Scene scene, EcsSystemID system);
-
 void destroySystem(Scene scene, EcsSystemID system);
 
 
