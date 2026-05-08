@@ -128,7 +128,7 @@ void avLogV(AvResult result, uint64 line, const char* file, const char* func, co
 void avAssertEx(bool32 assert, const char* expression, uint64 line,  const char* file, const char* func, const char* category, const char* fmt, ...);
 
 #ifndef AV_LOG_CATEGORY
-#define AV_LOG_CATEGORY "default"
+#define AV_LOG_CATEGORY ""
 #endif
 
 #define AV_LOCATION_PARAMS __LINE__, __FILE__, __func__

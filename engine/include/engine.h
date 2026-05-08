@@ -11,14 +11,14 @@ typedef struct ApplicationConfig {
     char* name;
 } ApplicationConfig;
 
+typedef struct EngineState* EngineHandle;
+
 typedef struct EngineConfig {
     ApplicationConfig appConfig;
-    bool8 (*initialize)(struct EngineConfig* app_inst);
-    void (*onResize)(struct EngineConfig* app_inst, uint32 width, uint32 height);
-    void (*shutdown)(struct EngineConfig* app_inst);
+    bool8 (*initialize)(EngineHandle engine);
+    void (*onResize)(EngineHandle engine, uint32 width, uint32 height);
+    void (*shutdown)(EngineHandle engine);
 } EngineConfig;
-
-typedef struct EngineHandle EngineHandle;
 
 AV_API bool8 engineInitialize(struct EngineConfig* config);
 

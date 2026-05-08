@@ -2,6 +2,8 @@
 
 #include "defines.h"
 
+#include "engine.h"
+
 #include "ecsSystem/componentMask.h"
 #include "core/systems/jobs.h"
 
@@ -65,6 +67,8 @@ typedef struct SelectionAccessCriteria {
     ComponentMask requiredRead; // entities must contain
     ComponentMask requiredWrite; // entities must contain
     ComponentMask excluded; // entities must not contain (internally checked)
+    ComponentMask frameDataRead;
+    ComponentMask frameDataWrite;
 } SelectionAccessCriteria;
 
 typedef enum SystemExecution {
@@ -99,3 +103,12 @@ void destroySystem(Scene scene, EcsSystemID system);
 
 // returns batch id of last running jobBatch, and registers everything to the fence
 void sceneRunSystems(Scene scene, JobFence fence);
+
+
+typedef uint16 FrameData;
+FrameData registerFrameData(Scene scene, uint64 size, uint32 alignment, bool32 resizable);
+void* accessFrameData(Scene scene, FrameData resource, uint64* size); // receive pointer to frame data
+bool32 frameDataResize(Scene scene, FrameData resource, uint64 newSize); 
+
+AV_API Scene currentScene(EngineHandle engine);
+AV_API Scene setCurrentScene(EngineHandle engine, Scene newScene);

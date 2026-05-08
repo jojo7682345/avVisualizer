@@ -6,7 +6,7 @@
 #include <AvUtils/avMemory.h>
 #include <AvUtils/avString.h>
 
-#include "core/platform/platform.h"
+#include "core/platform.h"
 
 typedef struct AvLogQueue {
     AvLogMessage* buffer;
@@ -271,22 +271,32 @@ void avLogConsoleSink(const AvLogMessage* msg, void* userData) {
         (msg->result & AV_ERROR) ? "ERROR" :
         (msg->result & AV_WARNING) ? "WARN" :
         (msg->result & AV_INFO) ? "INFO" :
-        (msg->result & AV_DEBUG) ? "DEBUG" : "LOG";
+        (msg->result & AV_DEBUG) ? "DEBUG" : "SUCCESS";
 
     const char* color =
         (msg->result & AV_ERROR) ? AV_COLOR_RED :
         (msg->result & AV_WARNING) ? AV_COLOR_YELLOW :
-        (msg->result & AV_INFO) ? AV_COLOR_WHITE :
+        (msg->result & AV_INFO) ? AV_COLOR_CYAN :
         (msg->result & AV_DEBUG) ? AV_COLOR_BLUE : AV_COLOR_GREEN;
 
-    printf("["COLOR"%s"COLOR"] %g [%s] %s\n",
-        color,
-        level,
-        AV_COLOR_RESET,
-        msg->timestamp,
-        msg->category,
-        msg->text
-    );
+    if(avCStringLength(msg->category)==0){
+        printf("["COLOR"%s"COLOR"] %g %s\n",
+            color,
+            level,
+            AV_COLOR_RESET,
+            msg->timestamp,
+            msg->text
+        );
+    }else{
+        printf("["COLOR"%s"COLOR"] %g [%s] %s\n",
+            color,
+            level,
+            AV_COLOR_RESET,
+            msg->timestamp,
+            msg->category,
+            msg->text
+        );
+    }
 }
 
 void avLogFileSink(const AvLogMessage* msg, void* userData) {

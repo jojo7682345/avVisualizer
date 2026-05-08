@@ -167,6 +167,10 @@ JobBatchID allocateJobBatch(JobBatchDescription* description, uint32 depdendency
 }
 
 static bool32 tryPin(JobBatchID id, struct JobBatchPoolSlot** out){
+    if(id==JOB_BATCH_NONE){
+        avError("Invalid job batch handle");
+        return false;
+    }
     union JobBatchReferenceSlot ref = {.id = id};
     struct JobBatchPoolSlot* slot = &jobBatchPool.slots[ref.identifier];
 
@@ -218,6 +222,7 @@ static void dropHandle(struct JobBatchPoolSlot* slot){
             if(submitToMainQueue(depSlot->batch.flags.priority, slot->dependents[i])==JOB_BATCH_NONE){
                 avError("Failed to submit job to main queue");
             }
+            //avDebug("Added dependent to job queue");
         }
     }
 }

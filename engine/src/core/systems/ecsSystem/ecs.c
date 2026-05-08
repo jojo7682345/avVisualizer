@@ -529,6 +529,11 @@ AV_API Scene sceneCreate(){
     initListPool(&scene->pool);
     MAPPING_CREATE(scene->systems, MAX_SYSTEMS);
     scene->systemOrder = darrayCreate(EcsSystemID);
+    scene->frameDataCapacity = 0;
+    scene->frameDataDescriptorCapacity = 0;
+    scene->frameDataDescriptorCount = 0;
+    scene->frameDataDescriptors = NULL;
+    scene->frameDataMem = NULL;
     return scene;
 }
 
@@ -559,6 +564,8 @@ AV_API void sceneDestroy(Scene scene){
     darrayDestroy(scene->systemOrder);
     freeListPool(&scene->pool);
     
+    if(scene->frameDataMem) avFree(scene->frameDataMem);
+    if(scene->frameDataDescriptors) avFree(scene->frameDataDescriptors);
     
     avFree(scene);
 }

@@ -169,6 +169,8 @@ func buildTest(){
  
 }
 
+
+
 func avVisualizer() {
     runFunctionFromProject("./tools/shaderEmbed/shaderEmbed.project", "shaderEmbed");
     if(!buildShaders()){
@@ -179,4 +181,52 @@ func avVisualizer() {
     buildTest();
 }
 
+func runTests(){
+    avVisualizer();
+
+
+    var libflags=[
+        "-ggdb",
+        "-MMD",
+        "-DAV_DEBUG_ALLOC"
+    ];
+    var includes=[
+        "engine/include",
+        "engine/src"
+    ];
+
+    var libDirs=[
+        "bin"
+    ];
+    var libs=[
+        "avVisualizer",
+        "avUtils"
+    ];
+    var srcDir = [
+        "tests"
+    ];
+    var libName = "";
+    var libLnkName = "";
+    var binName = "";
+    if(PLATFORM=="WINDOWS"){
+        libName = PROJECT_NAME + ".dll";
+        libLnkName = PROJECT_NAME + ".lib";
+        binName = "tests" + ".exe";
+    }else if(PLATFORM=="LINUX"){
+        libName = "lib" + PROJECT_NAME + ".so";
+        libLnkName = "lib" + PROJECT_NAME + ".a";
+        binName = "tests";
+    }
+    println("started compilation of tests");
+    var objects = recompile(getSourceFiles(srcDir), "build", libflags, includes, additionalDependencies + ["bin/" + libName, "bin/" + libLnkName]);
+    if(requiresRelink("bin/" + binName, objects, additionalDependencies)){ // + ["bin/" + libName, "bin/" + libLnkName]
+        makeDir("bin");
+        
+        linkExecutable(objects, "bin", "tests", libflags, libDirs, libs);
+    }
+    println("complation of testbed complete");
+
+    println(command "bin/tests");
+
+}
 

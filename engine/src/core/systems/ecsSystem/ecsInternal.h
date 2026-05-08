@@ -80,6 +80,12 @@ typedef struct EntityType {
     GenericList systems;
 }EntityType;
 
+typedef struct FrameDataDescriptor {
+    uint32 alignment; // constant
+    uint64 capacity; // if capacity == 0, then it is not resizable, may grow
+    uint64 size; // may grow
+    uint64 offset; // runtime dependent
+} FrameDataDescriptor;
 
 typedef struct System{
     Scene scene;
@@ -115,6 +121,12 @@ struct Scene {
     System* systems;
     SystemChunk* systemChunkMem; //darray
     EcsSystemID* systemOrder;
+
+    uint16 frameDataDescriptorCapacity;
+    uint16 frameDataDescriptorCount;
+    FrameDataDescriptor* frameDataDescriptors;
+    byte* frameDataMem;
+    uint64 frameDataCapacity;
 };
 
 

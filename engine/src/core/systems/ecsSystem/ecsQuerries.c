@@ -2,6 +2,8 @@
 #include "containers/idMapping.h"
 #include "containers/darray.h"
 
+#include <AvUtils/avMath.h>
+
 bool32 isQuerrySelected(SelectionAccessCriteria criteria, ComponentMask mask){
     ComponentMask required = componentMaskOr(criteria.requiredRead, criteria.requiredWrite);
     ComponentMask present = componentMaskAnd(required, mask);
@@ -105,12 +107,13 @@ void collectChunks(Scene scene, System* system, uint32* offset, uint32* count){
 }
 
 static inline void collectDependencies(uint32* dependencyCount, JobBatchID* dependencies, ComponentMask readMask, ComponentMask writeMask, uint32* lastReader, uint32* lastWriter, uint32 index, JobBatchID* batches){
-    *dependencyCount = 0; //reset dependencies
-        
     ITERATE_MASK(writeMask, c){
         uint32 writeDep = lastWriter[c];
         uint32 readDep = lastReader[c];
-        if(lastWriter[c]==(uint32)-1 && lastReader[c]==(uint32)-1) continue;
+        if(writeDep==(uint32)-1 && readDep==(uint32)-1) {
+            lastWriter[c] = index;
+            continue;
+        };
         
         bool32 foundRead = false;
         bool32 foundWrite = false;
@@ -133,6 +136,47 @@ static inline void collectDependencies(uint32* dependencyCount, JobBatchID* depe
     }
     ITERATE_MASK(readMask, c){
         lastReader[c] = index;
+        uint32 writeDep = lastWriter[c];
+        bool32 foundWrite = false;
+        for(uint32 i = 0; i < *dependencyCount; i++){
+            if(writeDep != (uint32)-1 && dependencies[i]==batches[writeDep]) {
+                foundWrite = true;
+            }
+        }
+        if(writeDep != (uint32)-1 && !foundWrite){
+            dependencies[(*dependencyCount)++] = batches[writeDep];
+        }
+    }
+}
+
+static inline void activateBlock(Scene scene, FrameData frameData, uint64* offset){
+    if(frameData >= scene->frameDataDescriptorCount) return;
+    FrameDataDescriptor* descr = &scene->frameDataDescriptors[frameData];
+    uint64 size = descr->size;
+    uint32 alignment = descr->alignment;
+    if(descr->offset!=(uint64)-1) return;
+
+    uint64 alignedOffset = *offset;
+    if(alignment!=0){
+        alignedOffset = alignedOffset + ((alignment - alignedOffset % alignment) % alignment);
+    }
+
+    uint64 newSize = alignedOffset + size;
+
+    if(newSize > scene->frameDataCapacity){
+        while(newSize > scene->frameDataCapacity){
+            scene->frameDataCapacity = AV_MAX(1, scene->frameDataCapacity * 2);
+        }
+        scene->frameDataMem = avReallocate(scene->frameDataMem, scene->frameDataCapacity, "");
+    }
+
+    descr->offset = alignedOffset;
+    *offset = alignedOffset + size;
+}
+
+static inline void resetFrameData(Scene scene){
+    for(uint16 i = 0; i < scene->frameDataDescriptorCount; i++){
+        scene->frameDataDescriptors[i].offset = (uint64)-1;
     }
 }
 
@@ -153,27 +197,48 @@ void sceneRunSystems(Scene scene, JobFence systemFence){
         lastReader[i] = (uint32)-1;
     }
 
+    uint32 lastFrameDataWriter[MAX_COMPONENT_COUNT];
+    uint32 lastFrameDataReader[MAX_COMPONENT_COUNT];
+    uint64 offset = 0;
+    for (uint32 i = 0; i < MAX_COMPONENT_COUNT; i++) {
+        lastFrameDataWriter[i] = (uint32)-1;
+        lastFrameDataReader[i] = (uint32)-1;
+    }
+    
+    resetFrameData(scene);
+
     JobBatchID dependencies[systemCount];
-    uint32 dependencyCount = 0;
 
     darrayClear(scene->systemChunkMem); // reset memory
 
-    for(uint32 index = 0; index < systemCount; index++){
-
-        System* system = MAPPING_GET(scene->systems, systemIds[index]);
+    System* systems[systemCount];
+    for(uint32 i = 0; i < systemCount; i++){
+        System* system = MAPPING_GET(scene->systems, systemIds[i]);
         if(system == NULL){
             avError("tried to access invalid system");
             return;
         }
-        collectChunks(scene, system, offsets + index, counts + index);
+        collectChunks(scene, system, offsets + i, counts + i);
+        systems[i] = system;
+    }
+
+    for(uint32 index = 0; index < systemCount; index++){
+        System* system = systems[index];
         
         if(counts[index]==0) continue;
 
         ComponentMask readMask = system->selection.requiredRead;
         ComponentMask writeMask = system->selection.requiredWrite;
-
+        uint32 dependencyCount = 0;
         collectDependencies(&dependencyCount, dependencies, readMask, writeMask, lastReader, lastWriter, index, batches);
-    
+        readMask = system->selection.frameDataRead;
+        writeMask = system->selection.frameDataWrite;
+        collectDependencies(&dependencyCount, dependencies, readMask, writeMask, lastFrameDataReader, lastFrameDataWriter, index, batches);
+
+        ITERATE_MASK(writeMask, frameData){
+            activateBlock(scene, frameData, &offset);
+        }
+
         if(system->dispatchOverride){
             batches[index] = system->dispatchOverride(scene, system->ctx, system->process, counts[index], scene->systemChunkMem + offsets[index], systemFence, dependencyCount, dependencies);
         }else{
