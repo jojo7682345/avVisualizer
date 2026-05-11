@@ -1,3 +1,4 @@
+#ifdef _WIN32
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_vulkan.h"
 #include "imgui/imgui_impl_win32.h"
@@ -99,3 +100,5 @@ void startFrame(){
 void endFrame(){
     ImGui::Render();
 }
+
+#endif

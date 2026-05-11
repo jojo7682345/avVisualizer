@@ -1,5 +1,7 @@
 #include "core/platform.h"
 
+#ifdef _WIN32
+
 #include "core/systems/input.h"
 #include "core/systems/event.h"
 #include "engine.h"
@@ -367,3 +369,6 @@ LRESULT CALLBACK win32ProcessMessage(HWND hwnd, uint32 msg, WPARAM w_param, LPAR
     return DefWindowProcA(hwnd, msg, w_param, l_param);
 }
 
+
+
+#endif

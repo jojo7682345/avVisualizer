@@ -1,3 +1,4 @@
+#ifdef _WIN32
 #include "../renderer.h"
 #include "containers/darray.h"
 #define VK_USE_PLATFORM_WIN32_KHR
@@ -28,3 +29,4 @@ bool32 vulkanPlatformCreateSurface(void* rendererState, void* platformState, voi
 	return true;
 
 }
+#endif

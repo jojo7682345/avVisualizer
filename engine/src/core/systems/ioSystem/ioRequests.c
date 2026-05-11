@@ -263,15 +263,19 @@ static JobControl ioProcess(byte* input, uint32 inputSize, byte* output, uint32 
     return ret;
 } 
 
+#ifndef O_BINARY
+#define O_BINARY 0
+#endif
+
 static void processRequest(IoRequest* request, uint32 index){
     request->result = IO_SUCCESS;
     // process io request
     int mode;
     switch(request->mode){
-        case IO_MODE_READ:      mode = _O_BINARY | _O_RDONLY; break;
-        case IO_MODE_WRITE:     mode = _O_BINARY | _O_WRONLY | _O_CREAT; break;
-        case IO_MODE_APPEND:    mode = _O_BINARY | _O_WRONLY | _O_CREAT | _O_APPEND; break;
-        case IO_MODE_WRITE_NEW: mode = _O_BINARY | _O_WRONLY | _O_CREAT | _O_EXCL; break;
+        case IO_MODE_READ:      mode = O_BINARY | O_RDONLY; break;
+        case IO_MODE_WRITE:     mode = O_BINARY | O_WRONLY | O_CREAT; break;
+        case IO_MODE_APPEND:    mode = O_BINARY | O_WRONLY | O_CREAT | O_APPEND; break;
+        case IO_MODE_WRITE_NEW: mode = O_BINARY | O_WRONLY | O_CREAT | O_EXCL; break;
         default: avError("invalid mode"); goto submitComplete;
     }
 
@@ -298,13 +302,13 @@ static void processRequest(IoRequest* request, uint32 index){
     }
     if(request->mode == IO_MODE_READ){
         if(request->size == 0){
-            if(lseek(fd, 0, SEEK_END) < 0){
+            uint64 size;
+            if((size = lseek(fd, 0, SEEK_END)) < 0){
                 request->result = IO_FILE_ERROR;
                 close(fd);
                 // skip to submit complete (sync)
                 goto submitComplete;
             }
-            uint64 size = tell(fd);
             request->size = size;
             if(lseek(fd, request->offset, SEEK_SET)){
                 request->result = IO_FILE_ERROR;

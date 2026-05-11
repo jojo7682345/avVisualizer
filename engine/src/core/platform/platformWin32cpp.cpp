@@ -1,3 +1,5 @@
+#ifdef _WIN32
+
 #include <windows.h>
 #include "imgui.h"
 #define VK_USE_PLATFORM_WIN32_KHR
@@ -60,3 +62,5 @@ LRESULT platformCppProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam){
     }
     return false;
 }
+
+#endif

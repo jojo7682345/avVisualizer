@@ -1,3 +1,4 @@
+#ifdef _WIN32
 // dear imgui: Platform Backend for Windows (standard windows API for 32-bits AND 64-bits applications)
 // This needs to be used along with a Renderer (e.g. DirectX11, OpenGL3, Vulkan..)
 
@@ -1503,3 +1504,4 @@ static void ImGui_ImplWin32_ShutdownMultiViewportSupport()
 #endif
 
 #endif // #ifndef IMGUI_DISABLE
+#endif
