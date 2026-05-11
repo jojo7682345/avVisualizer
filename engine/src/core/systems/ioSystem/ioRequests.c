@@ -368,7 +368,7 @@ static void processRequest(IoRequest* request, uint32 index){
             .inputStride = index,
             .outputData = NULL,
             .outputStride = 0,
-            .onComplete = NULL, // will be a custom submit to a specific IO queue
+            //.onComplete = NULL, // will be a custom submit to a specific IO queue
         };
         if(submitJobBatch(&batch, NULL)==JOB_BATCH_NONE){
             request->result = IO_PROCESS_ERROR;

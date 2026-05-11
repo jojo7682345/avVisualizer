@@ -114,6 +114,8 @@ bool8 initialize(EngineHandle engine){
     Entity foo = entityCreate(scene);
     Entity bar = entityCreate(scene);
 
+    setScene(engine, scene);
+
     entityAddComponent(scene, foo, COMPONENT_TYPE_FOO, NULL, 0);
     entityAddComponent(scene, foo, COMPONENT_TYPE_BAR, NULL, 0);
     entityAddComponent(scene, bar, COMPONENT_TYPE_BAR, NULL, 0);
@@ -126,15 +128,6 @@ bool8 initialize(EngineHandle engine){
 
     //entityRemoveComponent(scene, a, COMPONENT_TYPE_FOO);
     //entityRemoveComponentType(scene, a, COMPONENT_TYPE_FOO);
-
-    avLog(AV_DEBUG, "Entity %x has %u foo components", foo, entityHasComponent(scene, foo, COMPONENT_TYPE_FOO));
-
-    sceneApply(scene);
-
-    
-    avLog(AV_DEBUG, "Entity %x has %u foo components", foo, entityHasComponent(scene, foo, COMPONENT_TYPE_FOO));
-    
-    sceneRunSystems(scene, NULL);
 
     // submitIoRead("./avVisualizer.project", exampleIoProcess, exampleIoComplete, NULL); // wastefull
     
@@ -163,12 +156,12 @@ bool8 initialize(EngineHandle engine){
 }
 
 
-void onResize(struct EngineConfig* app_inst, uint32 width, uint32 height){
+void onResize(EngineHandle engine, uint32 width, uint32 height){
 
 }
 
-void shutdown(struct EngineConfig* app_inst){
-    sceneDestroy(scene);
+void shutdown(EngineHandle engine){
+    
 }
 
 const char* disabledLogCategories[] = {

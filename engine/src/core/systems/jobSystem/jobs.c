@@ -593,58 +593,59 @@ void processBatchCompletion(JobBatchID id){
     JobBatchDescription batch;
     getJobBatch(id, &batch);
 
-    if(batch.onComplete){
-        avRWLockReadLock(state->resultLock);
+    // if(batch.onComplete){
+    //     avRWLockReadLock(state->resultLock);
 
-        uint32 index = atomic_fetch_add_explicit(&state->resultBufferIndex, 1, memory_order_acq_rel);
-        if(index >= JOB_RESULT_BUFFER_SIZE){
-            avFatal("Job result buffer overrun");
-            avRWLockReadUnlock(state->resultLock);
-            goto doFreeJob;
-        }
+    //     uint32 index = atomic_fetch_add_explicit(&state->resultBufferIndex, 1, memory_order_acq_rel);
+    //     if(index >= JOB_RESULT_BUFFER_SIZE){
+    //         avFatal("Job result buffer overrun");
+    //         avRWLockReadUnlock(state->resultLock);
+    //         goto doFreeJob;
+    //     }
 
-        state->resultBuffer[index] = id;
+    //     state->resultBuffer[index] = id;
 
-        avRWLockReadUnlock(state->resultLock);
-        return;
-    }else{
+    //     avRWLockReadUnlock(state->resultLock);
+    //     return;
+    // }else
+    {
         doFreeJob:
         freeJobBatch(id);
         atomic_fetch_sub(&state->allWorkDoneFence.workLeft, 1);
     }
 }
 
-void processResults(){
-    avRWLockWriteLock(state->resultLock);
-    atomic_thread_fence(memory_order_acquire);
+// void processResults(){
+//     avRWLockWriteLock(state->resultLock);
+//     atomic_thread_fence(memory_order_acquire);
 
-    for(uint32 i = 0; i < state->resultBufferIndex; i++){
-        JobBatchDescription batch;
-        JobBatchID id = state->resultBuffer[i];
-        getJobBatch(id, &batch);
-        if(!batch.onComplete){
-            avError("logic error");
-            continue;
-        }
-        batch.onComplete(batch.inputData, batch.inputStride, batch.outputData, batch.outputStride);
-        freeJobBatch(id);
-        atomic_fetch_sub(&state->allWorkDoneFence.workLeft, 1);
-    }
-    state->resultBufferIndex = 0;
-    atomic_thread_fence(memory_order_release);
-    avRWLockWriteUnlock(state->resultLock);
+//     for(uint32 i = 0; i < state->resultBufferIndex; i++){
+//         JobBatchDescription batch;
+//         JobBatchID id = state->resultBuffer[i];
+//         getJobBatch(id, &batch);
+//         if(!batch.onComplete){
+//             avError("logic error");
+//             continue;
+//         }
+//         batch.onComplete(batch.inputData, batch.inputStride, batch.outputData, batch.outputStride);
+//         freeJobBatch(id);
+//         atomic_fetch_sub(&state->allWorkDoneFence.workLeft, 1);
+//     }
+//     state->resultBufferIndex = 0;
+//     atomic_thread_fence(memory_order_release);
+//     avRWLockWriteUnlock(state->resultLock);
 
-}
+// }
 
-AV_API void jobSystemUpdate(){
-    if(avThreadGetID()!=AV_MAIN_THREAD_ID) {
-        avError("Can only process results on main thread");
-        return;
-    };
+// AV_API void jobSystemUpdate(){
+//     if(avThreadGetID()!=AV_MAIN_THREAD_ID) {
+//         avError("Can only process results on main thread");
+//         return;
+//     };
 
-    jobFenceWait(&state->frameFence);
-    processResults();
-}
+//     jobFenceWait(&state->frameFence);
+//     processResults();
+// }
 
 AV_API uint32 jobSystemGetWorkerCount(){
     return state->threadCount;

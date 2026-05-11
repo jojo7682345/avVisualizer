@@ -75,7 +75,7 @@ typedef struct JobBatchDescription {
     void* inputData;
     void* outputData;
     JobEntry entry;
-    JobBatchCallback onComplete;
+    //JobBatchCallback onComplete;
     JobFence fence;
 } JobBatchDescription;
 
@@ -138,7 +138,7 @@ AV_API void jobFenceInitRaw(JobFence* fence, void* mem);
 AV_API JobBatchID submitJobBatch(JobBatchDescription* batch, JobFence fence);
 AV_API JobBatchID submitJobBatchWithDependencies(JobBatchDescription* batch, uint32 dependencyCount, JobBatchID* dependencies, JobFence fence);
 
-AV_API void jobSystemUpdate();
+//AV_API void jobSystemUpdate();
 
 AV_API uint32 jobSystemGetWorkerCount();
 AV_API void jobSystemQuerryWorkerThreads(uint32* threadCount, uint16* threadIds);

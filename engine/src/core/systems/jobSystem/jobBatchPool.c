@@ -213,11 +213,11 @@ static void dropHandle(struct JobBatchPoolSlot* slot){
     atomic_fetch_add_explicit(&slot->generation, 1, memory_order_acq_rel);
     atomic_fetch_sub_explicit(&jobBatchPool.activeJobBatchCount, 1, memory_order_relaxed);
     uint32 index = (uint32)(slot - jobBatchPool.slots);
-    freeListPush(&jobBatchPool, index);
-
-    uint32 dependentCount = atomic_load_explicit(&slot->dependentCount, memory_order_acquire);
+    uint32 dependentCount = atomic_exchange_explicit(&slot->dependentCount, 0, memory_order_acq_rel);
+    
     for(uint32 i = 0; i < dependentCount; i++){
         struct JobBatchPoolSlot* depSlot = getSlot(slot->dependents[i]);
+        if(depSlot==NULL) continue;
         if(atomic_fetch_sub_explicit(&depSlot->dependencyCount, 1, memory_order_acq_rel)==1){
             if(submitToMainQueue(depSlot->batch.flags.priority, slot->dependents[i])==JOB_BATCH_NONE){
                 avError("Failed to submit job to main queue");
@@ -225,6 +225,7 @@ static void dropHandle(struct JobBatchPoolSlot* slot){
             //avDebug("Added dependent to job queue");
         }
     }
+    freeListPush(&jobBatchPool, index);
 }
 
 

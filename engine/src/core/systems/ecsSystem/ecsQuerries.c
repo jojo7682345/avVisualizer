@@ -37,7 +37,7 @@ JobBatchID dispatchChunksFromSystemPtr(Scene scene, System* system, uint32 chunk
         .outputStride = sizeof(SystemChunk),
         .inputOffset = 0,
         .outputOffset = 0,
-        .onComplete = NULL,
+        //.onComplete = NULL,
         .entry = chunkDispatch,
     };
     return submitJobBatchWithDependencies(&batch, dependencyCount, dependencies, fence);
@@ -189,6 +189,9 @@ void sceneRunSystems(Scene scene, JobFence systemFence){
     uint32 offsets[systemCount];
     uint32 counts[systemCount];
     JobBatchID batches[systemCount];
+    for(uint32 i = 0; i < systemCount; i++){
+        batches[i] = JOB_BATCH_NONE;
+    }
 
     uint32 lastWriter[MAX_COMPONENT_COUNT];
     uint32 lastReader[MAX_COMPONENT_COUNT];

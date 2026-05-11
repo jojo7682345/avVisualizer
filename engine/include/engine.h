@@ -172,3 +172,5 @@ typedef enum SystemEventCode {
     /** @brief The maximum event code that can be used internally. */
     MAX_EVENT_CODE = 0xFF
 } SystemEventCode;
+
+AV_API uint16 getCurrentThreadId();

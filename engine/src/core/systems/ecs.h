@@ -111,4 +111,4 @@ void* accessFrameData(Scene scene, FrameData resource, uint64* size); // receive
 bool32 frameDataResize(Scene scene, FrameData resource, uint64 newSize); 
 
 AV_API Scene currentScene(EngineHandle engine);
-AV_API Scene setCurrentScene(EngineHandle engine, Scene newScene);
+AV_API Scene setScene(EngineHandle engine, Scene newScene);

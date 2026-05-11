@@ -625,5 +625,8 @@ void applyCommandBuffers(Scene scene, CommandBuffer* buffers, uint32 threadCount
 
 
     }
+    for(uint32 i = 0; i < threadCount; i++){
+        resetCommandBuffer(&buffers[i]);
+    }
 
 }

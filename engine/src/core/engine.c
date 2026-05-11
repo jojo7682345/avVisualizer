@@ -2,6 +2,7 @@
 
 #include <AvUtils/avLogging.h>
 #include <AvUtils/avMemory.h>
+#include <AvUtils/avThreading.h>
 
 #include "platform.h"
 #include "core/systems/event.h"
@@ -10,6 +11,7 @@
 #include "core/systems/jobs.h"
 #include "core/utils/clock.h"
 #include "renderer/renderer.h"
+#include "core/systems/ecs.h"
 
 typedef struct EngineState {
     EngineConfig config;
@@ -23,11 +25,8 @@ typedef struct EngineState {
 
     void* systemsMemory;
 
-    // Indicates if the window is currently being resized.
-    //b8 resizing;
-    // The current number of frames since the last resize operation.
-    // Only set if resizing = true. Otherwise 0.
-    //u8 frames_since_resize;
+    Scene currentScene;
+    Scene nextScene;
 } EngineState;
 
 static EngineState* engineState;
@@ -46,6 +45,7 @@ bool8 engineInitialize(EngineConfig* config) {
         return false;
     }
     engineState = avAllocate(sizeof(EngineState), "");
+    avMemset(engineState, 0, sizeof(EngineState));
     engineState->config = *config;
     engineState->is_running = false;
     engineState->is_suspended = false;
@@ -138,10 +138,14 @@ bool8 engineRun(EngineConfig* game_inst){
 
     systemsInitialize(game_inst);
 
-    if(!engineState->config.initialize(&engineState->config)){
+    if(!engineState->config.initialize(engineState)){
         avAssert(0, "Game failed to initialize");
         return false;
     }
+
+    byte frameFenceMem[JOB_FENCE_MEMORY_REQUIREMENT] = {0};
+    JobFence frameFence;
+    jobFenceInitRaw(&frameFence, frameFenceMem);
 
     while(engineState->is_running){
         if(!platformPumpMessages()){
@@ -155,10 +159,18 @@ bool8 engineRun(EngineConfig* game_inst){
         double delta = (current_time - engineState->last_time);
         double frame_start_time = platformGetAbsoluteTime();
 
+        if(engineState->currentScene) sceneRunSystems(engineState->currentScene, frameFence);
+        
         ioSystemUpdate();
 
-        
+        jobFenceWait(frameFence);
+
+        if(engineState->currentScene) sceneApply(engineState->currentScene);
     
+        if(engineState->nextScene!=NULL){
+            engineState->currentScene = engineState->nextScene;
+            engineState->nextScene = NULL;
+        }
 
         // prepare for next frame
         inputUpdate(); // store current keys pressed to previous keys pressed
@@ -167,8 +179,10 @@ bool8 engineRun(EngineConfig* game_inst){
     }
 
     engineState->is_running = false;
-    engineState->config.shutdown(&engineState->config);
+    engineState->config.shutdown(engineState);
 
+    if(engineState->currentScene) sceneDestroy(engineState->currentScene);
+    if(engineState->nextScene) sceneDestroy(engineState->nextScene);
 
     systemsUninitialize();
     avFree(engineState);
@@ -198,21 +212,18 @@ static void engineOnResized(Event* events, uint32 count){//(uint16 code, void* s
     uint16 height = 0;
     for(uint32 i = 0; i < count; i++){
         Event* event = events+i;
-
         if (event->id == EVENT_CODE_RESIZED) {
             resized = true;
             event->flags.consumed = 1;
             width = event->context.data.u16[0];
             height = event->context.data.u16[1];
             continue;
-
-            
         }
     }
     if(resized){
         engineState->width = width;
         engineState->height = height;
-        engineState->config.onResize(&engineState->config, engineState->width, engineState->height);
+        engineState->config.onResize(engineState, engineState->width, engineState->height);
         //rendererSignalResize();
     }
 }
@@ -223,90 +234,20 @@ void engine_on_event_system_initialized(void) {
     registerEventSink(EVENT_CODE_RESIZED, engineOnResized);
 }
 
-// bool8 engine_run(EngineConfig* game_inst) {
-    //     engineState->is_running = true;
-    //     clockStart(&engineState->clock);
-    //     clockUpdate(&engineState->clock);
-    //     engineState->last_time = engineState->clock.elapsed;
-    //     // f64 running_time = 0;
-    //     // TODO: frame rate lock
-    //     // u8 frame_count = 0;
-    //     double target_frame_seconds = 1.0f / 120;
-    //     double frame_elapsed_time = 0;
-        
-    //     systemsInitialize(game_inst);
-        
-    //     // Initialize the game.
-    //     if (!engineState->game_inst->initialize(engineState->game_inst)) {
-    //         avAssert(0, "Game failed to initialize.");
-    //         return false;
-    //     }
-    
-    //     while (engineState->is_running) {
-    //         if (!platformPumpMessages()) {
-    //             engineState->is_running = false;
-    //         }
-    //         eventsDispatch();
-    //         if (!engineState->is_suspended) {
-    //             // Update clock and get delta time.
-    //             clockUpdate(&engineState->clock);
-    //             double current_time = engineState->clock.elapsed;
-    //             double delta = (current_time - engineState->last_time);
-    //             double frame_start_time = platformGetAbsoluteTime();
-    
-        
-            
-        
-                
-    
-    //             ioSystemUpdate();
-    
-    //             // Figure out how long the frame took and, if below
-    //             double frame_end_time = platformGetAbsoluteTime();
-    //             frame_elapsed_time = frame_end_time - frame_start_time;
-    //             // running_time += frame_elapsed_time;
-    //             double remaining_seconds = target_frame_seconds - frame_elapsed_time;
-    
-    //             if (remaining_seconds > 0) {
-    //                 double remaining_ms = (remaining_seconds * 1000);
-    
-    //                 // If there is time left, give it back to the OS.
-    //                 double limit_frames = true;
-    //                 if (remaining_ms > 0 && limit_frames) {
-    //                     platformSleep(remaining_ms - 1);
-    //                 }
-    
-    //                 // TODO: frame rate lock
-    //                 // frame_count++;
-    //             }
-    
-    //             // NOTE: Input update/state copying should always be handled
-    //             // after any input should be recorded; I.E. before this line.
-    //             // As a safety, input is the last thing to be updated before
-    //             // this frame ends.
-    //             inputUpdate();
-    
-    //             // Update last time
-    //             engineState->last_time = current_time;
-    //             engineState->frameIndex++;
-    //         }
-    //     }
-    
-    //     engineState->is_running = false;
-    
-    //     // Shut down the game.
-    //     engineState->game_inst->shutdown(engineState->game_inst);
-    
-    //     // Unregister from events.
-    //     //eventUnregister(EVENT_CODE_APPLICATION_QUIT, 0, engineOnEvent);
-    //     //unregisterEventSink(EVENT_CODE_APPLICATION_QUIT, 0);
-    //     //inputSystemShutdown(inputMem);
-    
-    //     //platformSystemShutdown(platformMem);
-    //     systemsUninitialize();
-    //     avFree(engineState);
-    
-    //     avLogShutdown();
-    //     return true;
-    // }
 
+AV_API Scene currentScene(EngineHandle engine){
+    return engine->currentScene;
+}
+AV_API Scene setScene(EngineHandle engine, Scene newScene){
+    if(getCurrentThreadId()!=AV_MAIN_THREAD_ID) {
+        avError("Cannot set scene from other than the main thread");
+        return NULL;
+    }
+    Scene prevNextScene = engine->nextScene;
+    engine->nextScene = newScene;
+    return prevNextScene;
+}
+
+AV_API uint16 getCurrentThreadId(){
+    return avThreadGetID();
+}
