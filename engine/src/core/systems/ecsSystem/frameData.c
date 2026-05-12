@@ -26,7 +26,7 @@ void* accessFrameData(Scene scene, FrameData resource, uint64* size){
     if(resource >= scene->frameDataDescriptorCount) return NULL;
     FrameDataDescriptor* descr = &scene->frameDataDescriptors[resource];
     if(size) *size = descr->size;
-    if(descr->offset){
+    if(descr->offset==(uint64)-1){
         avError("Detected read before write of frame data %u", (uint32)resource);
         return NULL;
     }

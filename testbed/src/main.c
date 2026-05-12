@@ -26,19 +26,19 @@ typedef struct BarComponent {
 
 void fooConstructor(Scene scene, Entity entity, void* component, uint32 size, byte* data, uint32 dataSize){
     ((FooComponent*)component)->a = 2;
-    avLog(AV_DEBUG, "Initialized foo component of entity %x, with %u", entity, ((FooComponent*)component)->a);
+    //avLog(AV_DEBUG, "Initialized foo component of entity %x, with %u", entity, ((FooComponent*)component)->a);
 }
 void fooDestructor(Scene scene, Entity entity, void* component, uint32 size){
-    avLog(AV_DEBUG, "Uninitialized foo component of entity %x, with %u", entity, ((FooComponent*)component)->a);
+    //avLog(AV_DEBUG, "Uninitialized foo component of entity %x, with %u", entity, ((FooComponent*)component)->a);
 }
 
 void barConstructor(Scene scene, Entity entity, void* component, uint32 size, byte* data, uint32 dataSize){
     ((BarComponent*)component)->a = 2;
     ((BarComponent*)component)->b = 3;
-    avLog(AV_DEBUG, "Initialized bar component of entity %x, with %u %u", entity, ((BarComponent*)component)->a, ((BarComponent*)component)->b);
+    //avLog(AV_DEBUG, "Initialized bar component of entity %x, with %u %u", entity, ((BarComponent*)component)->a, ((BarComponent*)component)->b);
 }
 void barDestructor(Scene scene, Entity entity, void* component, uint32 size){
-    avLog(AV_DEBUG, "Uninitialized bar component of entity %x, with %u %u", entity, ((BarComponent*)component)->a, ((BarComponent*)component)->b);
+    //avLog(AV_DEBUG, "Uninitialized bar component of entity %x, with %u %u", entity, ((BarComponent*)component)->a, ((BarComponent*)component)->b);
 }
 
 volatile uint32 completedWork[12] = {0, 0};
@@ -60,7 +60,7 @@ JobControl exampleSystemProcess1(Scene scene, void* ctx, uint32 entityCount, con
     data[0] = 128;
 
     for(uint32 i = 0; i < entityCount; i++){
-        avDebug("System 1 for %x", entities[i]);
+        //avDebug("System 1 for %x", entities[i]);
     }
     JOB_EXIT();
 } 
@@ -68,7 +68,7 @@ JobControl exampleSystemProcess1(Scene scene, void* ctx, uint32 entityCount, con
 JobControl exampleSystemProcess2(Scene scene, void* ctx, uint32 entityCount, const Entity* entities, const ComponentData* components, JobContext* context){
     byte* data = accessFrameData(scene, FRAME_DATA_TEST, NULL);
     for(uint32 i = 0; i < entityCount; i++){
-        avDebug("System 2 for %x", entities[i]);
+        //avDebug("System 2 for %x", entities[i]);
     }
     JOB_EXIT();
 } 
@@ -111,14 +111,17 @@ bool8 initialize(EngineHandle engine){
     uint32 systemCount = sizeof(systems)/sizeof(EcsSystemID);
     sceneSetSystemsOrder(scene, systemCount, systems);
 
-    Entity foo = entityCreate(scene);
-    Entity bar = entityCreate(scene);
-
+    
     setScene(engine, scene);
-
-    entityAddComponent(scene, foo, COMPONENT_TYPE_FOO, NULL, 0);
-    entityAddComponent(scene, foo, COMPONENT_TYPE_BAR, NULL, 0);
-    entityAddComponent(scene, bar, COMPONENT_TYPE_BAR, NULL, 0);
+    
+    
+    for(uint32 i = 0; i < 1000; i++){
+        Entity foo = entityCreate(scene);
+        Entity bar = entityCreate(scene);
+        entityAddComponent(scene, foo, COMPONENT_TYPE_FOO, NULL, 0);
+        entityAddComponent(scene, foo, COMPONENT_TYPE_BAR, NULL, 0);
+        entityAddComponent(scene, bar, COMPONENT_TYPE_BAR, NULL, 0);
+    }
 
     // for(uint32 i = 0; i < 25; i++){
     //     Entity e = entityCreate(scene);

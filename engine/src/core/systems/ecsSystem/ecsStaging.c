@@ -537,7 +537,7 @@ void applyCommandBuffers(Scene scene, CommandBuffer* buffers, uint32 threadCount
         }
         destroyCommands += buffer->destroyCommands.count;
     }
-    avDebug("%u add, %u remove, %u destroy", addCommands, removeCommands, destroyCommands);
+    //avDebug("%u add, %u remove, %u destroy", addCommands, removeCommands, destroyCommands);
 
     collectStreamHeads(buffers, threadCount, heads, &headCount);
     
@@ -626,7 +626,7 @@ void applyCommandBuffers(Scene scene, CommandBuffer* buffers, uint32 threadCount
 
     }
     for(uint32 i = 0; i < threadCount; i++){
-        resetCommandBuffer(&buffers[i]);
+        commandBufferReset(&buffers[i]);
     }
 
 }

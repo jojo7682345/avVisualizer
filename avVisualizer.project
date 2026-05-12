@@ -87,10 +87,9 @@ func buildLib(){
         "engine/include",
         "engine/include/imgui",
         "engine/src",
+        "engine/src/renderer/shaders/spirv-reflect/include",
         "shaders/include",
         "$#VULKAN_SDK/Include",
-        "tools/spirv-reflect/include",
-        "tools/spirv-reflect",
     ];
     var libDirs=[
         "$#VULKAN_SDK/Lib"
@@ -98,7 +97,6 @@ func buildLib(){
     var libs=[
         "m",
         "avUtils",
-        "vulkan",
         "shaderc_shared"
     ];
     var srcDir = [
@@ -107,10 +105,11 @@ func buildLib(){
     var libName = "";
     var libLnkName = "";
     if(PLATFORM=="WINDOWS"){
-        libs += [ "user32", "gdi32", "D2d1", "windowscodecs", "opengl32", "Dwmapi" ];
+        libs += [ "user32", "gdi32", "D2d1", "windowscodecs", "opengl32", "Dwmapi", "vulkan-1" ];
         libName = PROJECT_NAME + ".dll";
         libLnkName = PROJECT_NAME + ".lib";
     }else if(PLATFORM=="LINUX"){
+        libs += [ "vulkan" ];
         libName = "lib" + PROJECT_NAME + ".so";
         libLnkName = "lib" + PROJECT_NAME + ".a";
     }
