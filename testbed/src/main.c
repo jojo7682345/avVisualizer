@@ -3,10 +3,6 @@
 #include <core/systems/jobs.h>
 #include <core/systems/io.h>
 
-extern bool8 renderFrameCpp(struct EngineConfig*);
-
-extern bool8 initializeCpp(struct EngineConfig*);
-
 Scene scene = {0};
 
 ComponentType COMPONENT_TYPE_FOO = INVALID_COMPONENT;

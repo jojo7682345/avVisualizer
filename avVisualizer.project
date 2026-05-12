@@ -119,7 +119,7 @@ func buildLib(){
     objects += recompile(getCppFiles(srcDir), "build", libflags + ["-xc++", "-lstdc++", "-shared-libgcc" ], includes, additionalDependencies); //+ 
     if(requiresRelink("bin/"+libName, objects, additionalDependencies)){
         makeDir("bin");
-        linkExecutable(objects, "bin", PROJECT_NAME + ".dll", libflags + [ "--shared",compileString("-Wl,--out-implib=bin/$libLnkName"), "-shared-libgcc" ], libDirs, libs + ["stdc++"]);
+        linkExecutable(objects, "bin", libName, libflags + [ "--shared",compileString("-Wl,--out-implib=bin/$libLnkName"), "-shared-libgcc" ], libDirs, libs + ["stdc++"]);
     }
     println("complation of engine complete");
 }
@@ -130,7 +130,8 @@ func buildTest(){
     var libflags=[
         "-ggdb",
         "-MMD",
-        "-DAV_DEBUG_ALLOC"
+        "-DAV_DEBUG_ALLOC",
+        "-Wl,-rpath,\"\$ORIGIN\""
     ];
     var includes=[
         "engine/include",
@@ -162,7 +163,7 @@ func buildTest(){
     }
     println("started compilation of testbed");
     var objects = recompile(getSourceFiles(srcDir), "build", libflags, includes, additionalDependencies + ["bin/" + libName, "bin/" + libLnkName]);
-    objects += recompile(getCppFiles(srcDir), "build", libflags, includes, additionalDependencies);
+    //objects += recompile(getCppFiles(srcDir), "build", libflags, includes, additionalDependencies);
     if(requiresRelink("bin/" + binName, objects, additionalDependencies)){ // + ["bin/" + libName, "bin/" + libLnkName]
         makeDir("bin");
         

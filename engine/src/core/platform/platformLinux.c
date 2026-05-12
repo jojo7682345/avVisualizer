@@ -5,8 +5,10 @@
 #include <AvUtils/avMemory.h>
 
 
-#include <wayland-client.h>
+
 #include <dlfcn.h>
+
+#include "linux/wayland.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -45,31 +47,13 @@ typedef struct PlatformBackend {
 static PlatformBackend backend = {0};
 static void* platform_state;
 
-#define WAYLAND_FUNCS \
-    WL(display_connect) \
-    WL(display_disconnect) \
-    WL(display_get_registry) \
-    WL(registry_add_listener) \
-	WL(display_dispatch)\
 
 
-typedef struct WaylandAPI {
-	void* lib;
-	#define WL(fn) typeof(wl_##fn)* fn;
-	WAYLAND_FUNCS
-	#undef WL
 
-	struct wl_display* display;
-	struct wl_registry* registry;
 
-} WaylandAPI;
 
-static void loadSym(void* lib, void** func, const char* name){
-	*func = dlsym(lib, name);
-	if(*func == NULL){
-		avFatal("Missing symbol %s", name);
-	}
-}
+
+
 
 void registry_global_handler(void *data, struct wl_registry *registry, uint32_t name, const char *interface, uint32_t version) {
     printf("interface: '%s', version: %u, name: %u\n", interface, version, name);
@@ -80,29 +64,36 @@ void registry_global_remove_handler(
     printf("removed: %u\n", name);
 }
 
-static PlatformBackend createWaylandBackend(){
+static bool32 createWaylandBackend(PlatformBackend* bkend){
 	void *lib = dlopen("libwayland-client.so.0", RTLD_LAZY);
-	PlatformBackend bkend = {0};
+	if(lib==NULL){
+		avError("Unable to load libwayland-client.so.0");
+		return false;
+	}
 	WaylandAPI* api = avAllocate(sizeof(WaylandAPI), "");
-	bkend.api = api;
-	api->lib = lib;
-	#define WL(fn) loadSym(api->lib, (void**)&api->fn, "wl_"#fn);
-	WAYLAND_FUNCS
-	#undef WL
+	if(!loadWaylandSymbols(lib, api)){
+		dlclose(lib);
+		avFree(api);
+		return false;
+	}
+	bkend->api = api;
+	
+	
+	
 
-	api->display = api->display_connect(NULL);
-	api->registry = api->display_get_registry(api->display);
+	api->display = wl_display_connect(NULL);
+	api->registry = wl_display_get_registry(api->display);
 	struct wl_registry_listener registry_listener = {
         .global = registry_global_handler,
         .global_remove = registry_global_remove_handler
     };
-	api->registry_add_listener(api->registry, &registry_listener, NULL);
+	wl_registry_add_listener(api->registry, &registry_listener, NULL);
 
 	while(1){
-		api->display_dispatch(api->display);
+		wl_display_dispatch(api->display);
 	}
 
-	return bkend;
+	return true;
 }
 
 static void destroyWaylandBackend(){
@@ -117,7 +108,7 @@ static void destroyWaylandBackend(){
 	backend.initialized = false;
 }
 
-static PlatformBackend createX11Backend(void){
+static bool32 createX11Backend(PlatformBackend* bkend){
 
 }
 
@@ -125,9 +116,15 @@ static PlatformBackend createX11Backend(void){
 bool8 platformSystemStartup(uint64* memoryRequirement, void* state, void* config) {
 	if(backend.initialized==false){
 		if (isWayland()) {
-			backend = createWaylandBackend();
+			if(!createWaylandBackend(&backend)){
+				avError("Unable to create wayland backend");
+				return false;
+			}
 		} else if (isX11()) {
-			backend = createX11Backend();
+			if(!createX11Backend(&backend)){
+				avError("Unable to create X11 backend");
+				return false;
+			}
 		} else {
 			return false;
 		}
@@ -136,7 +133,16 @@ bool8 platformSystemStartup(uint64* memoryRequirement, void* state, void* config
 }
 
 
+void platformSystemShutdown(void* platformState){
 
+}
 
+bool8 platformPumpMessages(void){
+	return false;
+}
+
+double platformGetAbsoluteTime(void){
+	
+}
 
 #endif

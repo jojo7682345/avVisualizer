@@ -234,9 +234,9 @@ static void logInternal(AvResult result, uint64 line, const char* file, const ch
     avMutexUnlock(logger.condMutex);
 
     if(result >= logger.assertLevel){
-        debug_break();
         avLogShutdown();
         abort();
+        debug_break();
     }
 }
 

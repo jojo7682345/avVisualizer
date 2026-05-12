@@ -20,25 +20,25 @@ int main(void) {
     // Request the application instance from the application.
     EngineConfig config = {0};
     if (!configureEngine(&config)) {
-        avAssert(0,"Could not create application!");
+        avError("Could not create application!");
         return -1;
     }
 
     // Ensure the function pointers exist.
     if (!config.initialize) {
-        avAssert(0,"The application's function pointers must be assigned!");
+        avError("The application's function pointers must be assigned!");
         return -2;
     }
 
     // Initialization.
     if (!engineInitialize(&config)) {
-        avAssert(0,"Engine failed to create!.");
+        avError("Engine failed to create!.");
         return 1;
     }
 
     // Begin the engine loop.
     if (!engineRun(&config)) {
-        avAssert(0, "Application did not shutdown gracefully.");
+        avError("Application did not shutdown gracefully.");
         return 2;
     }
 

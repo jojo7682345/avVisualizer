@@ -105,15 +105,27 @@ bool8 systemsInitialize(EngineConfig* config){
     uint64 totalMemSize = 0;
     for(uint32 i = 0; i < sizeof(engineSystems)/sizeof(EngineSystem); i++){
         uint64 memSize = 0;
-        engineSystems[i].initialize(&memSize, NULL, engineSystems[i].config);
+        if(!engineSystems[i].initialize(&memSize, NULL, engineSystems[i].config)){
+            avError("System failed to initialize");
+            return false;
+        }
         totalMemSize += memSize;
     }
     engineState->systemsMemory = avAllocate(totalMemSize, "Allocating systems memory");
     byte* memory = engineState->systemsMemory;
     for(uint32 i = 0; i < sizeof(engineSystems)/sizeof(EngineSystem); i++){
         uint64 memSize = 0;
-        engineSystems[i].initialize(&memSize, memory, engineSystems[i].config);
         engineSystems[i].state = memory;
+        if(!engineSystems[i].initialize(&memSize, memory, engineSystems[i].config)){
+            avError("System failed to initialize");
+            if(i>0){
+                for(uint32 j = i-1; j != (uint32)-1; j--){
+                    engineSystems[i].uninitialize(engineSystems[i].state);
+                }
+            }
+            avFree(engineState->systemsMemory);
+            return false;
+        }
         memory += memSize;
     }
 
@@ -136,7 +148,11 @@ bool8 engineRun(EngineConfig* game_inst){
     double targetFrameSeconds = 1.0f / 120.0f;
     double frameElapsedTime = 0;
 
-    systemsInitialize(game_inst);
+    if(!systemsInitialize(game_inst)){
+        avFree(engineState);
+        avLogShutdown();
+        return false;
+    }
 
     if(!engineState->config.initialize(engineState)){
         avAssert(0, "Game failed to initialize");
