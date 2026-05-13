@@ -111,7 +111,7 @@ bool8 initialize(EngineHandle engine){
     setScene(engine, scene);
     
     
-    for(uint32 i = 0; i < 1000; i++){
+    for(uint32 i = 0; i < 10; i++){
         Entity foo = entityCreate(scene);
         Entity bar = entityCreate(scene);
         entityAddComponent(scene, foo, COMPONENT_TYPE_FOO, NULL, 0);

@@ -130,6 +130,7 @@ bool8 systemsInitialize(EngineConfig* config){
     }
 
     engine_on_event_system_initialized();
+    return true;
 }
 
 void systemsUninitialize(){

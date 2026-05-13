@@ -129,9 +129,6 @@ bool8 platformSystemStartup(uint64 *memoryRequirement, void *state_ptr, void *co
     // Clock setup
     clock_setup();
 
-    extern void initPlatformCpp(HWND hwnd);
-    initPlatformCpp(handle);
-
     return true;
 }
 
@@ -226,11 +223,7 @@ static uint32 pendingHeight = 0;
 
 LRESULT CALLBACK win32ProcessMessage(HWND hwnd, uint32 msg, WPARAM w_param, LPARAM l_param) {
     
-    extern LRESULT platformCppProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
     LRESULT res = 0;
-    if(res = platformCppProc(hwnd, msg, w_param, l_param)){
-        return res;
-    }
 
     switch (msg) {
         case WM_ERASEBKGND:
@@ -369,6 +362,55 @@ LRESULT CALLBACK win32ProcessMessage(HWND hwnd, uint32 msg, WPARAM w_param, LPAR
     return DefWindowProcA(hwnd, msg, w_param, l_param);
 }
 
+static uint64 pageSize = 0;
+static uint64 allocationSize = 0;
+static uint64 addressSpaceSize = 0;
+
+AV_API uint64 platformGetPageSize(){
+    if(pageSize!=0) return pageSize;
+    SYSTEM_INFO info;
+    GetSystemInfo(&info);
+    pageSize = (uint64)info.dwPageSize;
+    return pageSize;
+}
+
+AV_API uint64 platformGetAllocationGranularity(){
+    if(allocationSize!=0) return allocationSize;
+    SYSTEM_INFO info;
+    GetSystemInfo(&info);
+    allocationSize = (uint64)info.dwAllocationGranularity;
+    return allocationSize;
+}
+
+AV_API VirtualMemoryRegion platformReserveMemory(uint64 size){
+    avAssert(size % platformGetAllocationGranularity() == 0, "Invalid size");
+    VirtualMemoryRegion region = {0};
+    void* ptr = VirtualAlloc(NULL, (SIZE_T)size, MEM_RESERVE, PAGE_NOACCESS);
+    if(!ptr) return region;
+    region.ptr = ptr;
+    region.size = size;
+    return region;
+}
+AV_API bool32 platformCommitMemory(void* ptr, uint64 size){
+    avAssert((size % platformGetPageSize()) == 0, "Invalid size");
+    avAssert(((uintptr_t)ptr & platformGetPageSize()) == 0, "Invalid ptr");
+    void* result = VirtualAlloc(ptr, (SIZE_T)size, MEM_COMMIT, PAGE_READWRITE);
+    return result != NULL;
+}
+AV_API bool32 platformDecommitMemory(void* ptr, uint64 size){
+    avAssert((size % platformGetPageSize()) == 0, "Invalid size");
+    avAssert(((uintptr_t)ptr & platformGetPageSize()) == 0, "Invalid ptr");
+    BOOL ok = VirtualFree(ptr, (SIZE_T)size, MEM_DECOMMIT);
+    return ok != 0;
+}
+AV_API void platformReleaseMemory(VirtualMemoryRegion region){
+    if(!region.ptr) return;
+    VirtualFree(
+        region.ptr,
+        0,
+        MEM_RELEASE
+    );
+}
 
 
 #endif

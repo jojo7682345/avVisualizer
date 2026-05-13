@@ -219,6 +219,7 @@ bool8 initializeIoSystem(uint64* memoryRequirements, void* statePtr, void* confi
     avInfo("inline buffer size: %uKB", state->inlineBufferSize / 1024);
     avInfo("max in-flight requests: %u", state->concurrentRequestCount);
     avInfo("total reserved IO memory: %uMB", queueMemSize / (1024 * 1024));
+    return true;
 }
 
 void deinitializeIoSystem(void* statePtr){

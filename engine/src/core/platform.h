@@ -73,3 +73,18 @@ double platformGetAbsoluteTime(void);
  * @param ms The number of milliseconds to sleep for.
  */
 AV_API void platformSleep(uint64 ms);
+
+
+
+AV_API uint64 platformGetPageSize();
+AV_API uint64 platformGetAllocationGranularity();
+
+typedef struct VirtualMemoryRegion {
+    uint64 size;
+    void* ptr;
+}VirtualMemoryRegion;
+
+AV_API VirtualMemoryRegion platformReserveMemory(uint64 size);
+AV_API bool32 platformCommitMemory(void* ptr, uint64 size);
+AV_API bool32 platformDecommitMemory(void* ptr, uint64 size);
+AV_API void platformReleaseMemory(VirtualMemoryRegion region);

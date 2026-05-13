@@ -184,9 +184,13 @@ static uint32 getChunkID(EntityChunk* chunk){
 }
 
 EntityChunk* getChunk(uint32 chunkID){
-    if(chunkID >= MAX_CHUNKS) return NULL;
+    if(chunkID >= MAX_CHUNKS) {
+        return NULL;
+    }
     uint32 index = chunkPool.chunkIndex[chunkID];
-    if(index >= chunkPool.chunkCount) return NULL;
+    if(index >= chunkPool.chunkCount){
+        return NULL;
+    } 
     return chunkPool.chunks + index;
 }
 

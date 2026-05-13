@@ -116,7 +116,7 @@ func buildLib(){
 
     println("started compilation of engine");
     var objects = recompile(getSourceFiles(srcDir), "build", libflags, includes, additionalDependencies);
-    objects += recompile(getCppFiles(srcDir), "build", libflags + ["-xc++", "-lstdc++", "-shared-libgcc" ], includes, additionalDependencies); //+ 
+    //objects += recompile(getCppFiles(srcDir), "build", libflags + ["-xc++", "-lstdc++", "-shared-libgcc" ], includes, additionalDependencies); //+ 
     if(requiresRelink("bin/"+libName, objects, additionalDependencies)){
         makeDir("bin");
         linkExecutable(objects, "bin", libName, libflags + [ "--shared",compileString("-Wl,--out-implib=bin/$libLnkName"), "-shared-libgcc" ], libDirs, libs + ["stdc++"]);
