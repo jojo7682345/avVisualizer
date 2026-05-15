@@ -49,3 +49,7 @@ AV_API bool8 initMemorySystem(AddressAllocatorConfig config){
     return true;
 
 }
+
+AV_API deinitMemorySystem(){
+    platformReleaseMemory(state.addressSpace);
+}
