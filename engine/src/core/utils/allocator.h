@@ -2,9 +2,9 @@
 
 #include "defines.h"
 
-typedef struct AddressAllocatorConfig {
+typedef struct MemorySystemConfig {
     uint64 addressSpaceSize; // if zero, then default to 32TB
-} AddressAllocatorConfig;
+} MemorySystemConfig;
 
 
 #define _1KB (1024)
@@ -21,6 +21,7 @@ typedef enum AllocatorOperation{
     ALLOCATOR_RESET, // allocator result holds size=1
 }AllocatorOperation;
 
+// alignments must be power of 2
 typedef struct AllocatorAlignment {
     uint32 max; // max alignment of 0 means no maximum
     uint32 min; // min of 0 means no alignment minimum
@@ -98,7 +99,23 @@ static inline uint64 alignForward(uint64 ptr, uint64 align) {
     return p;
 }
 
+// (uint32)-1 indicates requested alignment falls outside alignment min/max
+static inline uint32 checkAlignment(uint64 requestedAlignment, AllocatorAlignment alignment){
+    uint32 result = (uint32)requestedAlignment;
+    if(result == 0) result = alignment.preffered;
+    if(alignment.min != 0 && result < alignment.min) return (uint32)-1;
+    if(alignment.max != 0 && result > alignment.max) return (uint32)-1;
+    if(result != 0 && (result & (result - 1)) != 0) return (uint32)-1;
+    return result;
+}
+
+static inline bool32 isAligned(uint64 ptr, uint64 align){
+    return ((uint64)ptr & (align - 1)) == 0;
+}
+
 Allocator initAllocatorBase(void* ctx, AllocatorDispatch dispatch, Allocator* upstream, AllocatorCapabilities capabilities);
 
-AV_API bool8 initMemorySystem(AddressAllocatorConfig config);
+extern Allocator* pageAllocator;
+
+AV_API bool8 initMemorySystem(MemorySystemConfig config);
 

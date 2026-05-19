@@ -24,7 +24,7 @@ static AllocationResult regionAllocatorDispatch(Allocator* self, AllocationReque
 
 }
 
-AV_API bool8 initMemorySystem(AddressAllocatorConfig config){
+AV_API bool8 initMemorySystem(MemorySystemConfig config){
     state.pageSize = platformGetPageSize();
     if(config.addressSpaceSize==0) config.addressSpaceSize = ADRESS_ALLOCATOR_ADDRESS_SIZE; 
 
