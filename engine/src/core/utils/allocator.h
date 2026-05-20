@@ -7,10 +7,10 @@ typedef struct MemorySystemConfig {
 } MemorySystemConfig;
 
 
-#define _1KB (1024)
-#define _1MB (1024 * _1KB)
-#define _1GB (1024 * _1MB)
-#define _1TB (1024 * _1GB)
+#define _1KB (1024ULL)
+#define _1MB (1024ULL * _1KB)
+#define _1GB (1024ULL * _1MB)
+#define _1TB (1024ULL * _1GB)
 
 typedef struct Allocator Allocator;
 
@@ -35,6 +35,7 @@ typedef struct AllocatorCapabilities {
     uint32 supportsReset : 1;
     uint32 supportsAlignment : 1;
     AllocatorAlignment alignment;
+    uint64 minSize;
 }AllocatorCapabilities;
 
 // ptr == 0 && size == 0 indicates failure
@@ -46,33 +47,12 @@ typedef struct AllocationResult {
     };
 } AllocationResult;
 
-typedef struct AllocationRequest {
-    uint64 size;
-    uint64 align;
-    void* oldPtr;
-    uint64 oldSize;
-    AllocationMetaData* metaData;
-    uint32 metaDataCount;
-    AllocatorOperation op;
-    AllocationLifetimePolicy lifetime;
-    AllocationGrowthPolicy growth;
-}AllocationRequest;
-
-typedef struct AllocationMetaData {
-    uint32 type;
-    void* data;
-}AllocationMetaData;
-
-typedef AllocationResult (*AllocatorDispatch)(
-    Allocator* self, // the allocator
-    AllocationRequest request
-);
 
 typedef enum AllocationLifetimePolicy {
-    ALLOCATION_LIFETIME_STATIC,      // effectively permanent
-    ALLOCATION_LIFETIME_STABLE,      // long-lived but not immortal
-    ALLOCATION_LIFETIME_DYNAMIC,     // medium churn
-    ALLOCATION_LIFETIME_TRANSIENT,   // high churn / short lived
+    ALLOCATION_LIFETIME_PERMANENT,      // effectively permanent
+    ALLOCATION_LIFETIME_LONG_LIVED,      // long-lived but not immortal
+    ALLOCATION_LIFETIME_SHORT_LIVED,     // medium churn
+    ALLOCATION_LIFETIME_FRAME_LIVED,   // high churn / short lived
 } AllocationLifetimePolicy;
 
 typedef enum AllocationGrowthPolicy {
@@ -80,6 +60,32 @@ typedef enum AllocationGrowthPolicy {
     ALLOCATION_GROWTH_IN_PLACE,
     ALLOCATION_GROWTH_RELOCATE,
 }AllocationGrowthPolicy;
+
+typedef struct AllocationMetaData {
+    uint32 type;
+    void* data;
+}AllocationMetaData;
+
+typedef struct AllocationRequest {
+    AllocatorOperation op;
+    uint32 align;
+    uint32 metaDataCount;
+    AllocationGrowthPolicy growth;
+    AllocationLifetimePolicy lifetime;
+    uint64 size;
+    void* oldPtr;
+    union {
+        uint64 oldSize;
+        uint64 reservedSize;
+    };
+    AllocationMetaData* metaData;
+}AllocationRequest;
+
+
+typedef AllocationResult (*AllocatorDispatch)(
+    Allocator* self, // the allocator
+    AllocationRequest request
+);
 
 struct Allocator {
     AllocatorDispatch dispatch;

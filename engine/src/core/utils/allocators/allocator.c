@@ -50,6 +50,6 @@ AV_API bool8 initMemorySystem(MemorySystemConfig config){
 
 }
 
-AV_API deinitMemorySystem(){
+AV_API void deinitMemorySystem(){
     platformReleaseMemory(state.addressSpace);
 }

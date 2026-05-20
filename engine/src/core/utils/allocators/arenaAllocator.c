@@ -55,7 +55,7 @@ void arenaAllocatorDestroy(ArenaAllocator* allocator, uint32 metaDataCount, Allo
         .metaDataCount = metaDataCount,
         .metaData = metaData,
     };
-    allocator->base.dispatch(&allocator->base.upstream, request);
+    allocator->base.dispatch(allocator->base.upstream, request);
     allocator->base.dispatch = NULL;
     allocator->base.ctx = NULL;
     allocator->base.upstream = NULL;
@@ -76,5 +76,5 @@ void arenaAllocatorReset(ArenaAllocator* allocator){
     AllocationRequest request = {
         .op = ALLOCATOR_RESET,
     };
-    return arenaAllocatorAllocateRaw(&allocator->base, request).ptr;
+    arenaAllocatorAllocateRaw(&allocator->base, request);
 }

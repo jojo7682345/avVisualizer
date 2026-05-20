@@ -1,16 +1,8 @@
 #include "../allocator.h"
 #include "logging.h"
-#include "platform.h"
+#include "core/platform.h"
 
 #include <stdatomic.h>
-
-typedef enum AddressSpaceZone {
-    ADDRESS_SPACE_ZONE_STATIC,
-    ADDRESS_SPACE_ZONE_STABLE,
-    ADDRESS_SPACE_ZONE_DYNAMIC,
-    ADDRESS_SPACE_ZONE_TRANSIENT,
-    ADDRESS_SPACE_ZONE_COUNT
-} AddressSpaceZone;
 
 typedef struct BumpAllocator {
     struct Allocator base;
@@ -25,27 +17,7 @@ typedef struct ResetableBumpAllocator {
     VirtualMemoryRegion addressSpace;
 } ResetableBumpAllocator;
 
-typedef struct Node {
-    uint64 maxFreeRun;
-    uint64 prefixFreeRun;
-    uint64 suffixFreeRun;
-} Node;
-typedef uint64 Leaf;
-
-
-
-typedef struct AddressAllocator {
-    VirtualMemoryRegion addressSpace;
-    uint64 pageSize;
-
-    BumpAllocator fixedAllocator;
-    ResetableBumpAllocator transientAllocator;
-} AddressAllocator;
-
-
-
-
-AllocationResult fixedAllocatorAllocate(Allocator* self, AllocationRequest request){
+AllocationResult bumpAllocatorDispatch(Allocator* self, AllocationRequest request){
     AllocationResult result = {.ptr = 0, .success = 0};
     BumpAllocator* allocator = (BumpAllocator*)self->ctx;
     if(checkAlignment(request.align, self->capabilities.alignment)==(uint32)-1){
@@ -72,7 +44,7 @@ AllocationResult fixedAllocatorAllocate(Allocator* self, AllocationRequest reque
     }
 }
 
-AllocationResult scratchAllocatorAllocate(Allocator* self, AllocationRequest request){
+AllocationResult resetableBumpAllocatorDispatch(Allocator* self, AllocationRequest request){
     AllocationResult result = {.ptr = 0, .success = 0};
     ResetableBumpAllocator* allocator = (ResetableBumpAllocator*)self->ctx;
     if(checkAlignment(request.align, self->capabilities.alignment)==(uint32)-1){
@@ -110,7 +82,7 @@ AllocationResult scratchAllocatorAllocate(Allocator* self, AllocationRequest req
     }
 }
 
-bool32 fixedAllocatorCreate(BumpAllocator* allocator, VirtualMemoryRegion region, uint64 pageSize){
+bool32 bumpAllocatorCreate(BumpAllocator* allocator, VirtualMemoryRegion region, uint64 pageSize){
     allocator->base = (Allocator){
         .capabilities = (AllocatorCapabilities){
             .supportsResize = 0,
@@ -120,14 +92,14 @@ bool32 fixedAllocatorCreate(BumpAllocator* allocator, VirtualMemoryRegion region
             .alignment = { .max = pageSize, .min = pageSize, .preffered = pageSize }
         },
         .ctx = allocator,
-        .dispatch = fixedAllocatorAllocate,
+        .dispatch = bumpAllocatorDispatch,
         .upstream = NULL,
     };
     atomic_store_explicit(&allocator->offset, 0, memory_order_release);
     return true;
 }
 
-bool32 scratchAllocatorCreate(ResetableBumpAllocator* allocator, VirtualMemoryRegion region, uint64 pageSize){
+bool32 resetableBumpAllocatorCreate(ResetableBumpAllocator* allocator, VirtualMemoryRegion region, uint64 pageSize){
     allocator->base = (Allocator){
         .capabilities = (AllocatorCapabilities){
             .supportsResize = 0,
@@ -137,7 +109,7 @@ bool32 scratchAllocatorCreate(ResetableBumpAllocator* allocator, VirtualMemoryRe
             .alignment = { .max = pageSize, .min = pageSize, .preffered = pageSize }
         },
         .ctx = allocator,
-        .dispatch = scratchAllocatorAllocate,
+        .dispatch = resetableBumpAllocatorDispatch,
         .upstream = NULL,
     };
     allocator->offset = 0;
@@ -146,35 +118,3 @@ bool32 scratchAllocatorCreate(ResetableBumpAllocator* allocator, VirtualMemoryRe
     return true;
 }
 
-static uint64 highestPowerOfTwo(uint64 n) {
-    if (n == 0) return 0;
-
-    n |= n >> 1ULL;
-    n |= n >> 2ULL;
-    n |= n >> 4ULL;
-    n |= n >> 8ULL;
-    n |= n >> 16ULL;
-    n |= n >> 32ULL;
-
-    return n - (n >> 1ULL);
-}
-
-
-void initAddressAllocator(){
-
-    AddressAllocator allocator = {
-        // TODO: fill
-    };
-
-    VirtualMemoryRegion addressSpace; // receive from somewhere
-    uint64 pageSize;
-
-    
-    
-    uint64 regionSize = highestPowerOfTwo(addressSpace.size / ADDRESS_SPACE_ZONE_COUNT);
-    fixedAllocatorCreate(&allocator.fixedAllocator, (VirtualMemoryRegion){.ptr = (uint64)addressSpace.ptr + regionSize * 0, .size = regionSize}, pageSize);
-    scratchAllocatorCreate(&allocator.transientAllocator, (VirtualMemoryRegion){.ptr = (uint64)addressSpace.ptr + regionSize * 1, .size = regionSize}, pageSize);
-
-
-
-}
