@@ -382,9 +382,9 @@ AV_API uint64 platformGetAllocationGranularity(){
     return allocationSize;
 }
 
-AV_API VirtualMemoryRegion platformReserveMemory(uint64 size){
+AV_API MemoryRegion platformReserveMemory(uint64 size){
     avAssert(size % platformGetAllocationGranularity() == 0, "Invalid size");
-    VirtualMemoryRegion region = {0};
+    MemoryRegion region = {0};
     void* ptr = VirtualAlloc(NULL, (SIZE_T)size, MEM_RESERVE, PAGE_NOACCESS);
     if(!ptr) return region;
     region.ptr = ptr;
@@ -403,7 +403,7 @@ AV_API bool32 platformDecommitMemory(void* ptr, uint64 size){
     BOOL ok = VirtualFree(ptr, (SIZE_T)size, MEM_DECOMMIT);
     return ok != 0;
 }
-AV_API void platformReleaseMemory(VirtualMemoryRegion region){
+AV_API void platformReleaseMemory(MemoryRegion region){
     if(!region.ptr) return;
     VirtualFree(
         region.ptr,

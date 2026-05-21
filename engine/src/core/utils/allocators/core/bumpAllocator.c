@@ -1,21 +1,8 @@
 #include "../allocator.h"
 #include "logging.h"
 #include "core/platform.h"
+#include "bumpAllocator.h"
 
-#include <stdatomic.h>
-
-typedef struct BumpAllocator {
-    struct Allocator base;
-    _Atomic uint64 offset;
-    VirtualMemoryRegion addressSpace;
-} BumpAllocator;
-
-typedef struct ResetableBumpAllocator {
-    struct Allocator base;
-    _Atomic uint64 offset;
-    _Atomic uint64 generation;
-    VirtualMemoryRegion addressSpace;
-} ResetableBumpAllocator;
 
 AllocationResult bumpAllocatorDispatch(Allocator* self, AllocationRequest request){
     AllocationResult result = {.ptr = 0, .success = 0};
@@ -82,7 +69,7 @@ AllocationResult resetableBumpAllocatorDispatch(Allocator* self, AllocationReque
     }
 }
 
-bool32 bumpAllocatorCreate(BumpAllocator* allocator, VirtualMemoryRegion region, uint64 pageSize){
+bool32 bumpAllocatorCreate(BumpAllocator* allocator, MemoryRegion region, uint64 pageSize){
     allocator->base = (Allocator){
         .capabilities = (AllocatorCapabilities){
             .supportsResize = 0,
@@ -99,7 +86,7 @@ bool32 bumpAllocatorCreate(BumpAllocator* allocator, VirtualMemoryRegion region,
     return true;
 }
 
-bool32 resetableBumpAllocatorCreate(ResetableBumpAllocator* allocator, VirtualMemoryRegion region, uint64 pageSize){
+bool32 resetableBumpAllocatorCreate(ResetableBumpAllocator* allocator, MemoryRegion region, uint64 pageSize){
     allocator->base = (Allocator){
         .capabilities = (AllocatorCapabilities){
             .supportsResize = 0,
@@ -118,3 +105,14 @@ bool32 resetableBumpAllocatorCreate(ResetableBumpAllocator* allocator, VirtualMe
     return true;
 }
 
+void* bumpAllocatorAllocate(uint64 size, BumpAllocator* allocator){
+    AllocationRequest request = {
+        .size = size,
+        .op = ALLOCATOR_ALLOCATE,
+    }
+
+
+}
+void* resetableBumpAllocatorAllocate(uint64 size, ResetableBumpAllocator* allocator);
+
+void resetableBumpAllocatorReset(ResetableBumpAllocator* allocator);

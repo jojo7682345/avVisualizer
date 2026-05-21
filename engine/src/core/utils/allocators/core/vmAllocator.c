@@ -35,7 +35,7 @@ AllocationResult vmAllocatorDispatch(Allocator* self, AllocationRequest request)
             // if the reservation is not specified or the calculated commit size is larger than the request size, increase the reservation size
             if(reservationSize==0 || reservationSize < commitSize) reservationSize = alignForward(commitSize, allocator->allocationGranularity); 
             
-            VirtualMemoryRegion region = platformReserveMemory(reservationSize);
+            MemoryRegion region = platformReserveMemory(reservationSize);
             if(region.ptr == NULL) return result;
 
             // commit the allocation
@@ -63,7 +63,7 @@ AllocationResult vmAllocatorDispatch(Allocator* self, AllocationRequest request)
             if(request.oldPtr==NULL) return result;
             VmAllocationHeader* header = ((VmAllocationHeader*) request.oldPtr) - 1;
             
-            VirtualMemoryRegion region = {
+            MemoryRegion region = {
                 .ptr = header,
                 .size = header->reserved,
             };
@@ -83,7 +83,7 @@ AllocationResult vmAllocatorDispatch(Allocator* self, AllocationRequest request)
             VmAllocationHeader* header = (VmAllocationHeader*)request.oldPtr - 1;
             
             // reserved region
-            VirtualMemoryRegion region = {
+            MemoryRegion region = {
                 .ptr = header,
                 .size = header->reserved,
             };
@@ -135,6 +135,7 @@ bool32 vmAllocatorCreate(VmAllocator* allocator){
             .resizeInplace = 1,
             .supportsFree = 1,
             .supportsReset = 0,
+            .supportsReservation = 1,
             .supportsAlignment = 0,
             .alignment = { .max = 0, .min = 0, .preffered = 0 },
             .minSize = 0,

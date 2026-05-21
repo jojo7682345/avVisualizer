@@ -3,7 +3,7 @@
 
 static struct MemorySystemState {
     uint64 pageSize;
-    VirtualMemoryRegion addressSpace;
+    MemoryRegion addressSpace;
     Allocator regionAllocator;
 } state;
 

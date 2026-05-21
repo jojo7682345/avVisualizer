@@ -34,6 +34,7 @@ typedef struct AllocatorCapabilities {
     uint32 supportsFree : 1;
     uint32 supportsReset : 1;
     uint32 supportsAlignment : 1;
+    uint32 supportsReservation : 1; // means it can track allocations and grow them
     AllocatorAlignment alignment;
     uint64 minSize;
 }AllocatorCapabilities;
