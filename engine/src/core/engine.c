@@ -194,9 +194,9 @@ bool8 engineRun(EngineConfig* game_inst){
         engineState->last_time = current_time;
         engineState->frameIndex++;
 
-        // if(engineState->frameIndex % 100 ==0){
-        //     avDebug("FPS: %u", (uint32)(1.0/delta));
-        // }
+        if(engineState->frameIndex % 100 ==0){
+            avDebug("FPS: %u", (uint32)(1.0/delta));
+        }
     }
 
     engineState->is_running = false;

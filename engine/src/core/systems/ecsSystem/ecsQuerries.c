@@ -6,6 +6,9 @@
 
 bool32 isQuerrySelected(SelectionAccessCriteria criteria, ComponentMask mask){
     ComponentMask required = componentMaskOr(criteria.requiredRead, criteria.requiredWrite);
+    if(componentMaskIsEmpty(required)){
+        return false;
+    }
     ComponentMask present = componentMaskAnd(required, mask);
     if(!componentMaskEquals(present, required)){
         return false;

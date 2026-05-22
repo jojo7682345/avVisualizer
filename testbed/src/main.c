@@ -55,7 +55,7 @@ JobControl exampleSystemProcess1(Scene scene, void* ctx, uint32 entityCount, con
     byte* data = accessFrameData(scene, FRAME_DATA_TEST, NULL);
     data[0] = 128;
 
-    for(uint32 i = 0; i < entityCount; i++){
+    for(uint32 i = 0; i < entityCount*1000; i++){
         //avDebug("System 1 for %x", entities[i]);
     }
     JOB_EXIT();
@@ -63,7 +63,7 @@ JobControl exampleSystemProcess1(Scene scene, void* ctx, uint32 entityCount, con
 
 JobControl exampleSystemProcess2(Scene scene, void* ctx, uint32 entityCount, const Entity* entities, const ComponentData* components, JobContext* context){
     byte* data = accessFrameData(scene, FRAME_DATA_TEST, NULL);
-    for(uint32 i = 0; i < entityCount; i++){
+    for(uint32 i = 0; i < entityCount*1000; i++){
         //avDebug("System 2 for %x", entities[i]);
     }
     JOB_EXIT();
@@ -111,13 +111,14 @@ bool8 initialize(EngineHandle engine){
     setScene(engine, scene);
     
     
-    for(uint32 i = 0; i < 10; i++){
+    for(uint32 i = 0; i < 1000; i++){
         Entity foo = entityCreate(scene);
         Entity bar = entityCreate(scene);
         entityAddComponent(scene, foo, COMPONENT_TYPE_FOO, NULL, 0);
         entityAddComponent(scene, foo, COMPONENT_TYPE_BAR, NULL, 0);
         entityAddComponent(scene, bar, COMPONENT_TYPE_BAR, NULL, 0);
     }
+    avDebug("Completed enqueueing commands and allocating ids");
 
     // for(uint32 i = 0; i < 25; i++){
     //     Entity e = entityCreate(scene);

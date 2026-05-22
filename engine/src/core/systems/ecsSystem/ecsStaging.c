@@ -625,6 +625,7 @@ void applyCommandBuffers(Scene scene, CommandBuffer* buffers, uint32 threadCount
 
 
     }
+    avDebug("Performed commands");
     for(uint32 i = 0; i < threadCount; i++){
         commandBufferReset(&buffers[i]);
     }

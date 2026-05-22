@@ -7,9 +7,9 @@
 #include "logging.h"
 
 
-JobInstancePool jobInstancePool = {0};
 JobSystemState* state = NULL;
 
+static void jobInstancePoolInit();
 int32 workerThreadEntry(byte* data, uint64 size);
 AV_API bool8 jobSystemInitialize(uint64* memoryRequirement, void* statePtr, void* configPtr){
     *memoryRequirement = sizeof(JobSystemState);
@@ -35,21 +35,24 @@ AV_API bool8 jobSystemInitialize(uint64* memoryRequirement, void* statePtr, void
         avThreadSetName(threads[i].thread, buffer);
         localJobQueueInit(&threads[i].localQueue, LOCAL_QUEUE_RING_SIZE, jobsBuffer + LOCAL_QUEUE_SIZE*i);
         for(uint32 j = 0; j < JOB_PRIORITY_COUNT; j++){
-            atomic_store_explicit(&threads[i].workingOnBatch[j], JOB_BATCH_NONE, memory_order_release);
+            atomic_store_explicit(&threads[i].workingOnBatch[j].batch, JOB_BATCH_NONE, memory_order_release);
         }
     }
     jobQueueInit(&state->jobQueue, GLOBAL_QUEUE_RING_SIZE, jobbatchSlots);
 
     jobBatchPoolInit();
 
-    avRWLockCreate(&jobInstancePool.lock);
+    
     avSemaphoreCreate(&state->workPresent, 0);
     atomic_store(&state->activeThreads, 0);
-
-    for(uint32 i = 0; i < JOB_INSTANCE_POOL_SIZE; i++){
-        jobInstancePool.jobIndex[i] = i;
-        jobInstancePool.jobReference[i] = i;
-    }
+    
+    // jobInstancePool.lock = (SpinRwLock*)jobInstancePool.lockMem;
+    // spinRwLockInit(jobInstancePool.lock);
+    // for(uint32 i = 0; i < JOB_INSTANCE_POOL_SIZE; i++){
+    //     jobInstancePool.jobIndex[i] = i;
+    //     jobInstancePool.jobReference[i] = i;
+    // }
+    jobInstancePoolInit();
 
     for(uint32 i = 0; i < JOB_PRIORITY_COUNT; i++){
         atomic_store(&state->exchange[i], JOB_NONE);
@@ -82,79 +85,109 @@ AV_API void jobSystemDeinitialize(void* statePtr){
     avDebug("All work is completed");
 
     avSemaphoreDestroy(state->workPresent);
-    avRWLockDestroy(jobInstancePool.lock);
+
     jobBatchPoolDeinit();
 
     avFree(state->threads);
 
-    if(jobInstancePool.jobCount){
-        avError("%u jobs are still active", jobInstancePool.jobCount);
+    // if(jobInstancePool.jobCount){
+    //     avError("%u jobs are still active", jobInstancePool.jobCount);
+    // }
+}
+
+struct JobData {
+    JobExecutionContext context;
+    byte state[JOB_STATE_SIZE];
+};
+
+struct JobInstancePoolSlot {
+    union{
+        struct {
+            JobInstance instance;
+            struct JobData jobData;
+        };
+        JobID nextFree;
+    };
+};
+
+typedef struct JobInstancePool{
+    _Atomic(uint64) head;
+    struct JobInstancePoolSlot jobs[JOB_INSTANCE_POOL_SIZE];
+}JobInstancePool;
+
+JobInstancePool jobInstancePool = {0};
+
+static inline uint64 makeHead(uint32 tag, JobID index){
+    return ((uint64)tag<<32)|index;
+}
+static inline uint32 headTag(uint64 head){
+    return (uint32)(head>>32);
+}
+static inline uint32 headIndex(uint64 head){
+    return (uint32)(head & 0xffffffffu);
+}
+
+static void jobInstancePoolInit(){
+    for(uint64 i = 0; i < JOB_INSTANCE_POOL_SIZE-1; i++){
+        jobInstancePool.jobs[i].nextFree = i+1;
     }
+    jobInstancePool.jobs[JOB_INSTANCE_POOL_SIZE - 1].nextFree = JOB_NONE;
+    uint64 h = makeHead(0, 0);
+    atomic_store_explicit(&jobInstancePool.head, h, memory_order_release);
 }
 
 JobID allocateJob(JobInstance* instance){
-    avRWLockReadLock(jobInstancePool.lock);
-    uint32 index = atomic_fetch_add(&jobInstancePool.jobCount, 1);
-    if(index >= JOB_INSTANCE_POOL_SIZE){
-        atomic_store_explicit(&jobInstancePool.jobCount, JOB_INSTANCE_POOL_SIZE, memory_order_relaxed);
-        avRWLockReadUnlock(jobInstancePool.lock);
-        return JOB_NONE; // full
+    uint64 oldHead;
+    uint64 newHead;
+    JobID index = 0;
+    for(;;){
+        oldHead = atomic_load_explicit(&jobInstancePool.head, memory_order_acquire);
+        if(oldHead==JOB_NONE){
+            return JOB_NONE;
+        }
+        index = headIndex(oldHead);
+        JobID next = jobInstancePool.jobs[index].nextFree;
+        newHead = makeHead(headTag(oldHead)+1, next);
+        if(atomic_compare_exchange_weak_explicit(&jobInstancePool.head, &oldHead, newHead, memory_order_acq_rel, memory_order_acquire)){
+            break;
+        }
     }
     avMemset(jobInstancePool.jobs + index, 0, sizeof(struct JobInstancePoolSlot));
     avMemcpy(&(jobInstancePool.jobs + index)->instance, instance, sizeof(JobInstance));
-    JobID id = jobInstancePool.jobReference[index];
-    avRWLockReadUnlock(jobInstancePool.lock);
-    return id;
+    return index;
 }
 
 void freeJob(JobID job){
-    avRWLockWriteLock(jobInstancePool.lock);
-    atomic_thread_fence(memory_order_acquire);
-    uint32 index = jobInstancePool.jobIndex[job];
-    uint32 lastIndex = jobInstancePool.jobCount-1;
-    JobBatchID batch = jobInstancePool.jobs[index].instance.batch;
-    if(index==lastIndex) {
-        jobInstancePool.jobCount--;
-        atomic_thread_fence(memory_order_release);
-        avRWLockWriteUnlock(jobInstancePool.lock);
-        goto signalComplete;
+    if(job==JOB_NONE) return;
+    uint64 oldHead;
+    uint64 newHead;
+
+    JobBatchID batch = jobInstancePool.jobs[job].instance.batch;
+
+    for(;;){
+        oldHead = atomic_load_explicit(&jobInstancePool.head, memory_order_acquire);
+        jobInstancePool.jobs[job].nextFree = headIndex(oldHead);
+        newHead = makeHead(headTag(oldHead)+1, job);
+        if(atomic_compare_exchange_weak_explicit(&jobInstancePool.head, &oldHead, newHead, memory_order_release, memory_order_acquire)){
+            break;
+        }
     }
-    JobID lastId = jobInstancePool.jobReference[lastIndex];
-    jobInstancePool.jobReference[lastIndex] = job;
-    jobInstancePool.jobReference[index] = lastId;
-    jobInstancePool.jobIndex[job] = lastIndex;
-    jobInstancePool.jobIndex[lastId] = index;
-    avMemswap(jobInstancePool.jobs + index, jobInstancePool.jobs + lastIndex, sizeof(struct JobInstancePoolSlot));
-    jobInstancePool.jobCount--;
-    atomic_thread_fence(memory_order_release);
-    avRWLockWriteUnlock(jobInstancePool.lock);
-signalComplete:
+
     if(signalJobComplete(batch)){
         // all work from batch is completed
-        
-        processBatchCompletion(batch);
-        
+        processBatchCompletion(batch);    
     }
 }
 
-
 void getJobInstance(JobID job, JobInstance* instance, struct JobData* state){
-    avRWLockReadLock(jobInstancePool.lock);
-    uint32 index = jobInstancePool.jobIndex[job];
-    JobInstance* target = &jobInstancePool.jobs[index].instance;
-    struct JobData* targetState = &jobInstancePool.jobs[index].jobData;
-    avMemcpy(instance, target, sizeof(JobInstance));
-    avMemcpy(state, targetState, sizeof(struct JobData));
-    avRWLockReadUnlock(jobInstancePool.lock);
+    struct JobInstancePoolSlot* slot = jobInstancePool.jobs + job;
+    avMemcpy(instance, &slot->instance, sizeof(JobInstance));
+    avMemcpy(state, &slot->jobData, sizeof(struct JobData));
 }
 
 void storeJobData(JobID job, struct JobData* data){
-    avRWLockReadLock(jobInstancePool.lock);
-    uint32 index = jobInstancePool.jobIndex[job];
-    JobInstance* target = &jobInstancePool.jobs[index].instance;
-    struct JobData* targetState = &jobInstancePool.jobs[index].jobData;
-    avMemcpy(targetState, data, sizeof(struct JobData));
-    avRWLockReadUnlock(jobInstancePool.lock);
+    struct JobInstancePoolSlot* slot = jobInstancePool.jobs + job;
+    avMemcpy(&slot->jobData, data, sizeof(struct JobData));
 }
 
 struct batchSplit{uint32 count; uint32 remainingCount; } splitJobBatch(JobID* jobs, uint32 maxJobs, JobBatchID batch, WorkerThreadID workerThreadId){
@@ -203,7 +236,7 @@ static uint32 processJobBatchIntoBuffer(JobBatchID batch, WorkerThreadID workerT
     // If batch was not fully consumed, store remainder as "working on"
     if (split.remainingCount != 0) {
         wakeAdditionalWorkers(split.remainingCount);
-        if (atomic_exchange_explicit(&state->threads[workerThreadId].workingOnBatch[priority], batch, memory_order_acq_rel) != JOB_BATCH_NONE) {
+        if (atomic_exchange_explicit(&state->threads[workerThreadId].workingOnBatch[priority].batch, batch, memory_order_acq_rel) != JOB_BATCH_NONE) {
             avFatal("Invalid state: workingOnBatch already set");
         }
     }
@@ -229,7 +262,7 @@ JobID pushJobsToLocalQueue(JobID* jobs, uint32 jobCount, JobPriority priority, L
 JobID getJobFromWorkinOnBatch(WorkerThreadID threadId, JobPriority priority, LocalJobQueue* localQueue){
     WorkerThread* thread = &state->threads[threadId];
 
-    JobBatchID batch = atomic_exchange_explicit(&thread->workingOnBatch[priority], JOB_BATCH_NONE, memory_order_acq_rel);
+    JobBatchID batch = atomic_exchange_explicit(&thread->workingOnBatch[priority].batch, JOB_BATCH_NONE, memory_order_acq_rel);
     if(batch==JOB_BATCH_NONE){
         return JOB_NONE;
     }
@@ -268,12 +301,14 @@ JobID stealBatchFromOtherThread(WorkerThreadID threadId, uint32* stealIndex, Job
         if(index == threadId) continue;
 
         // first try to steal the working on batch
-        JobBatchID batch = atomic_exchange_explicit(&state->threads[index].workingOnBatch[priority], JOB_BATCH_NONE, memory_order_acq_rel);
-        if(batch!=JOB_BATCH_NONE){
-            JobID jobs[LOCAL_QUEUE_RING_SIZE] = {JOB_NONE};
-            uint32 jobCount = processJobBatchIntoBuffer(batch, threadId, priority, jobs, LOCAL_QUEUE_RING_SIZE);
-            *stealIndex = (index + 1) % state->threadCount;
-            return pushJobsToLocalQueue(jobs, jobCount, priority, localQueue);
+        JobBatchID batch = atomic_load_explicit(&state->threads[index].workingOnBatch[priority].batch, memory_order_acquire);
+        if(batch != JOB_BATCH_NONE){
+            if(atomic_compare_exchange_strong_explicit(&state->threads[index].workingOnBatch[priority].batch, &batch, JOB_BATCH_NONE, memory_order_acq_rel, memory_order_acquire)){
+                JobID jobs[LOCAL_QUEUE_RING_SIZE] = {JOB_NONE};
+                uint32 jobCount = processJobBatchIntoBuffer(batch, threadId, priority, jobs, LOCAL_QUEUE_RING_SIZE);
+                *stealIndex = (index + 1) % state->threadCount;
+                return pushJobsToLocalQueue(jobs, jobCount, priority, localQueue);
+            }
         }
     }
     return JOB_NONE;

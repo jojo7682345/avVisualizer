@@ -880,9 +880,11 @@ LocalEntity createLocalEntity(EntityType* type, EntityChunk** chunkPtr, uint32* 
     }
 
     if(chunk==NULL) {
-        type->chunkCapacity *= 2;
-        type->chunkCapacity = AV_MAX(type->chunkCapacity, 1);
-        type->chunks = avReallocate(type->chunks, sizeof(uint32)*type->chunkCapacity, "");
+        if(type->chunkCount >= type->chunkCapacity){
+            type->chunkCapacity *= 2;
+            type->chunkCapacity = AV_MAX(type->chunkCapacity, 1);
+            type->chunks = avReallocate(type->chunks, sizeof(uint32)*type->chunkCapacity, "");
+        }
         type->chunks[type->chunkCount++] = createChunk(type);
         chunk = getChunk(type->chunks[type->chunkCount-1]);
     }

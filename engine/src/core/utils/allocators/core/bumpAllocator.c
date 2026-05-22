@@ -1,4 +1,4 @@
-#include "../allocator.h"
+#include "../../allocator.h"
 #include "logging.h"
 #include "core/platform.h"
 #include "bumpAllocator.h"
@@ -109,7 +109,7 @@ void* bumpAllocatorAllocate(uint64 size, BumpAllocator* allocator){
     AllocationRequest request = {
         .size = size,
         .op = ALLOCATOR_ALLOCATE,
-    }
+    };
 
 
 }

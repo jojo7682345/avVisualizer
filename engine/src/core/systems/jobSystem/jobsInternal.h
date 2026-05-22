@@ -7,7 +7,9 @@
 #include <AvUtils/threading/avSemaphore.h>
 #include <AvUtils/threading/avConditionVariable.h>
 #include <AvUtils/avMemory.h>
-#include <AvUtils/threading/avRwLock.h>
+
+#include "core/utils/spinRwLock.h"
+
 #include <AvUtils/avMath.h>
 #include <AvUtils/avString.h>
 
@@ -35,29 +37,34 @@ typedef struct JobInstance {
     //uint32 stateSize;
 } JobInstance;
 
-typedef struct JobInstancePool {
-    _Atomic uint32 jobCount;
-    uint32 jobIndex[JOB_INSTANCE_POOL_SIZE];
-    JobID jobReference[JOB_INSTANCE_POOL_SIZE];
-    struct JobInstancePoolSlot {
-        JobInstance instance;
-        struct JobData {
-            JobExecutionContext context;
-            byte state[JOB_STATE_SIZE];
-        } jobData;
-    }jobs[JOB_INSTANCE_POOL_SIZE];
-    AvRwLock lock;
-} JobInstancePool;
+// typedef struct JobInstancePool {
+//     _Atomic uint32 jobCount;
+//     uint32 jobIndex[JOB_INSTANCE_POOL_SIZE];
+//     JobID jobReference[JOB_INSTANCE_POOL_SIZE];
+//     struct JobInstancePoolSlot {
+//         JobInstance instance;
+//         struct JobData {
+//             JobExecutionContext context;
+//             byte state[JOB_STATE_SIZE];
+//         } jobData;
+//     }jobs[JOB_INSTANCE_POOL_SIZE];
+
+//     byte lockMem[SPIN_RW_LOCK_MEMORY_REQUIREMENT];
+//     SpinRwLock* lock;
+// } JobInstancePool;
 
 
+struct WorkingOnBatchEntry {
+    _Atomic(JobBatchID) batch;
+}__attribute__((aligned (64)));
 
 typedef struct WorkerThread {
+    struct WorkingOnBatchEntry workingOnBatch[JOB_PRIORITY_COUNT]; 
     AvThread thread;
     LocalJobQueue localQueue;
     uint32 id;
     // keep batch around that we have already split of some jobs, so that we dont have to push it to the back of the queue again
     // threads that try to steal, first try to steal the batch instead of from the local queue to prevent congestion
-    _Atomic JobBatchID workingOnBatch[JOB_PRIORITY_COUNT]; 
 } WorkerThread;
 
 struct JobFence {
@@ -78,7 +85,9 @@ typedef struct JobSystemState {
 
     JobBatchID resultBuffer[JOB_RESULT_BUFFER_SIZE];
     _Atomic uint32 resultBufferIndex;
-    AvRwLock resultLock;
+    
+    byte lockMem[SPIN_RW_LOCK_MEMORY_REQUIREMENT];
+    SpinRwLock* resultLock;
 } JobSystemState;
 
 

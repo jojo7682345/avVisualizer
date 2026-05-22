@@ -91,10 +91,12 @@ static void dispatch(const AvLogMessage* msg){
     }
 }
 
+static double loggingStart = 0.0;
+
 static int32 logThreadMain(byte* data, uint64 dataSize){
     (void) data;
     (void) dataSize;
-
+    loggingStart = platformGetAbsoluteTime();
     AvLogMessage msg;
     while(logger.running){
         bool32 hadWork = false;
@@ -222,7 +224,7 @@ static void logInternal(AvResult result, uint64 line, const char* file, const ch
     msg.line = line;
     msg.file = file;
     msg.category = category;
-    msg.timestamp = platformGetAbsoluteTime();
+    msg.timestamp = platformGetAbsoluteTime() - loggingStart;
     msg.threadId = avThreadGetID();
 
     avStringPrintfToBufferVA(msg.text, sizeof(msg.text), AV_CSTR(fmt), args);
