@@ -39,7 +39,7 @@ struct JobBatchPool {
     _Atomic uint32 activeJobBatchCount;
     struct JobBatchPoolSlot slots[JOB_BATCH_POOL_SIZE];
 };
-static struct JobBatchPool jobBatchPool = {0};
+static struct JobBatchPool jobBatchPool;
 
 void jobBatchPoolInit(){
     for (uint32 i = 0; i < JOB_BATCH_POOL_SIZE - 1; i++) {
@@ -146,6 +146,7 @@ void onBatchComplete(struct JobBatchPoolSlot* slot){
     uint32 index = (uint32)(slot - jobBatchPool.slots);
     uint32 generation = atomic_load_explicit(&slot->generation, memory_order_relaxed);
     union JobBatchReferenceSlot ref = (union JobBatchReferenceSlot){.generation=generation, .identifier=index};
+    (void)ref;
     //avDebug("JobBatch %u:%u is complete", ref.generation, ref.identifier);
 }
 
@@ -248,6 +249,7 @@ JobBatchID allocateJobBatch(JobBatchDescription* description, uint32 depdendency
                 unresolvedCount++;
             }
         }
+        (void)unresolvedCount;
         if(atomic_fetch_sub_explicit(&slot->dependencyCount, 1, memory_order_acq_rel)==1){
             if(submitToMainQueue(slot->batch.flags.priority, id.id)==JOB_BATCH_NONE){
                 avError("Failed to submit job to main queue");

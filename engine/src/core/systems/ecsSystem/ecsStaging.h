@@ -58,8 +58,8 @@ typedef struct CommandBuffer {
 void commandBufferCreate(CommandBuffer* buffer);
 void commandBufferDestroy(CommandBuffer* buffer);
 
-void cmdEntityAddComponent(Scene scene, CommandBuffer* buffer, Entity entity, ComponentType type, void* constructorData, uint32 constructorDataSize);
-void cmdEntityRemoveComponent(Scene scene, CommandBuffer* buffer, Entity entity, ComponentType type);
-void cmdEntityDestroy(Scene scene, CommandBuffer* buffer, Entity entity);
+void cmdEntityAddComponent(CommandBuffer* buffer, Entity entity, ComponentType type, void* constructorData, uint32 constructorDataSize);
+void cmdEntityRemoveComponent(CommandBuffer* buffer, Entity entity, ComponentType type);
+void cmdEntityDestroy(CommandBuffer* buffer, Entity entity);
 
 void applyCommandBuffers(Scene scene, CommandBuffer* buffers, uint32 threadCount);

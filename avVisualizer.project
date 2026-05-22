@@ -23,7 +23,20 @@ var additionalDependencies = [
     "./tools/shaderEmbed/bin/shaderEmbed.project",
 ];
 
+func cleanPlugins(){
+    var plugins = directories in "plugins";
+    foreach pluginDir from plugins {
+        var plugin = fileName(pluginDir);
+        var projectFile = pluginDir + "/" + plugin + ".project";
 
+        if(!fileExists(projectFile)){
+            continue;
+        }else{
+            println("Cleaning plugin: " + plugin);
+            runFunctionFromProject(projectFile, "clean");
+        } 
+    }
+}
 
 func clean(){
    runFunctionFromProject("./tools/shaderEmbed/shaderEmbed.project", "clean");
@@ -31,6 +44,8 @@ func clean(){
     deleteDir("build");
     deleteDir("bin");
     deleteDir("shaders/include");
+
+    cleanPlugins();
     
 }
 
@@ -75,6 +90,49 @@ func getCppFiles(src){
     return filter(FILTER_TYPE_ENDS_WITH, [".cpp"], files in src recursive);
 }
 
+
+
+func buildPlugins(){
+    //find project files building the .so's
+    var pluginObjects = [];
+    var plugins = directories in "plugins";
+    makeDir("build");
+    makeDir("build/plugins");
+    foreach pluginDir from plugins {
+        var plugin = fileName(pluginDir);
+        var projectFile = pluginDir + "/" + plugin + ".project";
+
+        if(!fileExists(projectFile)){
+            println("Plugin " + plugin + " does not have project file");
+            continue;
+        }else{
+            println("Bulding plugin: " + plugin);
+            runFunctionFromProject(projectFile, plugin);
+        }
+        
+
+        // the plugin should now have a .so file in bin
+        var libFile = pluginDir + "/bin/";
+        if(PLATFORM=="WINDOWS"){
+            libFile += plugin + ".dll";
+        }else if(PLATFORM=="LINUX"){
+            libFile += "lib" + plugin + ".so";
+        }
+        if(!fileExists(libFile)){
+            println("Plugin " + plugin + " did not provide " + libFile);
+            continue;
+        }
+        var objectFile = "build/plugins/" + plugin + ".o";
+        command "ld -r -b binary " + libFile + " -o " + objectFile;
+        pluginObjects += objectFile;
+
+    }
+    if(arraySize(plugins) != arraySize(pluginObjects)){
+        println("Some plugins failed to build");
+    }
+    return pluginObjects;
+}
+
 func buildLib(){
     var libflags=[
         "-ggdb",
@@ -82,6 +140,10 @@ func buildLib(){
         "-DAV_EXPORT",
         "-DAV_DEBUG_ALLOC",
         "-fpic",
+        "-Wall",
+        "-Wextra",
+        "-fno-strict-aliasing",
+        "-rdynamic"
     ];
     var includes=[
         "engine/include",
@@ -89,6 +151,7 @@ func buildLib(){
         "engine/src",
         "engine/src/renderer/shaders/spirv-reflect/include",
         "shaders/include",
+        "plugins",
         "$#VULKAN_SDK/Include",
     ];
     var libDirs=[
@@ -113,9 +176,9 @@ func buildLib(){
         libName = "lib" + PROJECT_NAME + ".so";
         libLnkName = "lib" + PROJECT_NAME + ".a";
     }
-
     println("started compilation of engine");
     var objects = recompile(getSourceFiles(srcDir), "build", libflags, includes, additionalDependencies);
+    objects += buildPlugins();
     //objects += recompile(getCppFiles(srcDir), "build", libflags + ["-xc++", "-lstdc++", "-shared-libgcc" ], includes, additionalDependencies); //+ 
     if(requiresRelink("bin/"+libName, objects, additionalDependencies)){
         makeDir("bin");

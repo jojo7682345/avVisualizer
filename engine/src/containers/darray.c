@@ -36,7 +36,7 @@ void darrayDestroy(void* array) {
     if (array) {
         uint64 headerSize = sizeof(darrayHeader);
         darrayHeader* header = (darrayHeader*)((uint8*)array - headerSize);
-        uint64 total_size = headerSize + header->capacity * header->stride;
+        //uint64 total_size = headerSize + header->capacity * header->stride;
         if (!header->allocator) {
             avFree(header);
         }

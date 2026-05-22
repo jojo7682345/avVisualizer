@@ -94,6 +94,7 @@ bool8 eventSystemInitialize(uint64* memory_requirement, void* statePtr, void* co
 }
 
 void eventSystemShutdown(void* statePtr){
+    (void)statePtr;
     if(state==NULL){
         return;
     }
@@ -157,7 +158,7 @@ static bool32 removeStage(EventPipeline* pipeline, uint32 index){
     if(pipeline->stageCount==0){
         return false;
     }
-    if(index == pipeline->stageCount - 1){
+    if(index == (uint32)pipeline->stageCount - 1){
         pipeline->stageCount--;
         darrayLengthSet(pipeline->stages, pipeline->stageCount);
         darrayLengthSet(pipeline->stageIndex, pipeline->stageCount);

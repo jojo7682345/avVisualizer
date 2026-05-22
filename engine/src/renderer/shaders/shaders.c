@@ -223,7 +223,7 @@ static bool32 FormatIsFloat(VkFormat f){
 #undef VULKAN_FORMAT
 
 static shaderc_shader_kind translateShaderStage(ShaderStageType type){
-	shaderc_shader_kind shaderStage;
+	//shaderc_shader_kind shaderStage;
 	switch(type){
 		case SHADER_STAGE_VERTEX: return shaderc_vertex_shader;
 		case SHADER_STAGE_TESSELATION_CONTROL: return shaderc_tess_control_shader;
@@ -244,6 +244,7 @@ static VkShaderStageFlags translateVkShaderStage(ShaderStageType stageMask){
             (stageMask & SHADER_STAGE_COMPUTE ? 				VK_SHADER_STAGE_COMPUTE_BIT 				: 0);
 }
 
+__attribute__((unused))
 static bool32 enumerateShaderDataCounts(SpvReflectShaderModule* module, uint32* inputCount, uint32* outputCount, uint32* pushConstCount, uint32* descriptorSetCount){
 	SpvReflectResult result;
 	result = spvReflectEnumerateInputVariables(module, inputCount, NULL);
@@ -351,6 +352,7 @@ static uint64 hashBlockLayout(const SpvReflectBlockVariable* block)
 	return h;
 }
 
+__attribute__((unused))
 static bool32 descriptorTypesEqual(
     const ShaderDescriptorBinding* a,
     const ShaderDescriptorBinding* b)
@@ -375,9 +377,9 @@ static void getPushConstants(const SpvReflectBlockVariable* block, ShaderPushCon
 
 		const char* name = member->name ? member->name : "member";
 		if(parentName){
-			snprintf(qualifiedName, 256, "%s.%s", parentName, member->name);
+			snprintf(qualifiedName, 256, "%s.%s", parentName, name);
 		}else{
-			snprintf(qualifiedName, 256, "%s", member->name);
+			snprintf(qualifiedName, 256, "%s", name);
 		}
 
 		uint32 offset = baseOffset + member->offset;
@@ -496,6 +498,7 @@ bool32 processShaderStage(ShaderStage* stage){
 
 	avFree(inputVars);
 	spvReflectDestroyShaderModule(&module);
+	return true;
 }   
 
 bool32 validateShaderInterface(ShaderStage* vertex, ShaderStage* fragment){
@@ -935,7 +938,7 @@ ShaderLoadResult loadShader(VkDevice device, ShaderLoadInfo info, Shader* shader
 	for(uint32 i = 0; i < info.shaderStageCount; i++){
 		ShaderStageLoadInfo stageInfo = info.shaderStages[i];
 		shaderc_shader_kind shaderStage = translateShaderStage(stageInfo.stage);
-		if(shaderStage==-1){
+		if(shaderStage==(uint32)-1){
 			res |= SHADER_LOAD_ERROR_INVALID_SHADER_TYPE;
 			continue;
 		}
@@ -947,7 +950,7 @@ ShaderLoadResult loadShader(VkDevice device, ShaderLoadInfo info, Shader* shader
 			uint64 numWarnings = shaderc_result_get_num_warnings(result);
 			uint64 numErrors = shaderc_result_get_num_errors(result);
 			const char* errorMsg = shaderc_result_get_error_message(result);
-			fprintf(stderr, "compilation error:\n%s\n\ncompilation resulted in %i warnings and %i errors\n",errorMsg, numWarnings, numErrors);
+			fprintf(stderr, "compilation error:\n%s\n\ncompilation resulted in %lu warnings and %lu errors\n",errorMsg, numWarnings, numErrors);
 			res |= SHADER_LOAD_ERROR_COMPILATION_ERRORS;
 			shaderc_result_release(result);
 			continue;

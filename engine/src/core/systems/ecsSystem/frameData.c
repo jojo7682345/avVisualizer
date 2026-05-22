@@ -44,4 +44,5 @@ bool32 frameDataResize(Scene scene, FrameData resource, uint64 newSize){
         descr->size = newSize;
         return true;
     }
+    return true;
 }

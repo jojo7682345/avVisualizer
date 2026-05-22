@@ -65,11 +65,15 @@ AllocationResult resetableBumpAllocatorDispatch(Allocator* self, AllocationReque
             // then that space will be wasted this frame, but its fine I guess, as it will be fixed next frame
             atomic_fetch_add_explicit(&allocator->generation, 1, memory_order_acq_rel);
             atomic_store_explicit(&allocator->offset, 0, memory_order_release);
+            result.success = 1;
+            return result;
         }
     }
+    return result;
 }
 
 bool32 bumpAllocatorCreate(BumpAllocator* allocator, MemoryRegion region, uint64 pageSize){
+    (void)region;
     allocator->base = (Allocator){
         .capabilities = (AllocatorCapabilities){
             .supportsResize = 0,
@@ -87,6 +91,7 @@ bool32 bumpAllocatorCreate(BumpAllocator* allocator, MemoryRegion region, uint64
 }
 
 bool32 resetableBumpAllocatorCreate(ResetableBumpAllocator* allocator, MemoryRegion region, uint64 pageSize){
+    (void)region;
     allocator->base = (Allocator){
         .capabilities = (AllocatorCapabilities){
             .supportsResize = 0,
@@ -110,8 +115,10 @@ void* bumpAllocatorAllocate(uint64 size, BumpAllocator* allocator){
         .size = size,
         .op = ALLOCATOR_ALLOCATE,
     };
+    (void)allocator;
+    (void)request;
 
-
+    return NULL;
 }
 void* resetableBumpAllocatorAllocate(uint64 size, ResetableBumpAllocator* allocator);
 

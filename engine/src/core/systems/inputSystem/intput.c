@@ -30,6 +30,7 @@ static input_state* state;
 
 
 bool8 inputSystemInitialize(uint64* memory_requirement, void* statePtr, void* config) {
+    (void)config;
     *memory_requirement = sizeof(input_state);
     if (statePtr == 0) {
         return true;
@@ -47,8 +48,7 @@ bool8 inputSystemInitialize(uint64* memory_requirement, void* statePtr, void* co
 }
 
 void inputSystemShutdown(void* state) {
-    // TODO: Add shutdown routines when needed.
-    state = 0;
+    (void)state;
 }
 
 void inputUpdate() {
@@ -92,6 +92,7 @@ void inputUpdate() {
     avMemcpy(&state->mousePrevious, &state->mouseCurrent, sizeof(mouse_state));
 }
 
+__attribute__((unused))
 static bool8 checkModifiers(modifiers modifiers) {
     if (modifiers & MODIFIER_SHIFT_BIT) {
         if (!inputIsKeyDown(KEY_SHIFT) && !inputIsKeyDown(KEY_LSHIFT) && !inputIsKeyDown(KEY_RSHIFT)) {

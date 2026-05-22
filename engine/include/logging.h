@@ -80,11 +80,11 @@ typedef struct AvLogMessage{
     AvResult result;
     const char* file;
     const char* func;
-    const char* category;
     uint64 line;
     uint32 threadId;
     double timestamp;
     char text[1024];
+    char category[64];
 } AvLogMessage;
 
 extern const char* AV_COLOR_RED;

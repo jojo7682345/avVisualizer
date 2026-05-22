@@ -2,15 +2,15 @@
 #include <math.h>
 
 vec3 vec3Add(vec3 a, vec3 b) {
-    return (vec3){a.x+b.x, a.y+b.y, a.z+b.z};
+    return (vec3){{a.x+b.x}, {a.y+b.y}, {a.z+b.z}};
 }
 
 vec3 vec3Sub(vec3 a, vec3 b) {
-    return (vec3){a.x-b.x, a.y-b.y, a.z-b.z};
+    return (vec3){{a.x-b.x}, {a.y-b.y}, {a.z-b.z}};
 }
 
 vec3 vec3Scale(vec3 v, float s) {
-    return (vec3){v.x*s, v.y*s, v.z*s};
+    return (vec3){{v.x*s}, {v.y*s}, {v.z*s}};
 }
 
 float vec3Dot(vec3 a, vec3 b) {
@@ -19,25 +19,27 @@ float vec3Dot(vec3 a, vec3 b) {
 
 vec3 vec3Cross(vec3 a, vec3 b) {
     return (vec3){
-        a.y*b.z - a.z*b.y,
-        a.z*b.x - a.x*b.z,
-        a.x*b.y - a.y*b.x
+        {a.y*b.z - a.z*b.y},
+        {a.z*b.x - a.x*b.z},
+        {a.x*b.y - a.y*b.x}
     };
 }
 
 vec3 vec3Normalize(vec3 v) {
     float len = sqrtf(vec3Dot(v,v));
-    return (vec3){v.x/len, v.y/len, v.z/len};
+    return (vec3){{v.x/len}, {v.y/len}, {v.z/len}};
 }
 
 mat4 mat4Mul(mat4 a, mat4 b) {
     mat4 r = {0};
 
-    for(int i=0;i<4;i++)
-    for(int j=0;j<4;j++)
-    for(int k=0;k<4;k++)
-        r.m[i][j] += a.m[i][k]*b.m[k][j];
-
+    for(int i=0;i<4;i++){
+        for(int j=0;j<4;j++){
+            for(int k=0;k<4;k++){
+                r.m[i][j] += a.m[i][k]*b.m[k][j];
+            }
+        }
+    }
     return r;
 }
 

@@ -75,6 +75,7 @@ void finishAndExit(){
 }
 
 AV_API void jobSystemDeinitialize(void* statePtr){
+    (void)statePtr;
     if(state==NULL) return;
 
     finishAndExit();
@@ -190,7 +191,7 @@ void storeJobData(JobID job, struct JobData* data){
     avMemcpy(&slot->jobData, data, sizeof(struct JobData));
 }
 
-struct batchSplit{uint32 count; uint32 remainingCount; } splitJobBatch(JobID* jobs, uint32 maxJobs, JobBatchID batch, WorkerThreadID workerThreadId){
+struct batchSplit{uint32 count; uint32 remainingCount; } splitJobBatch(JobID* jobs, uint32 maxJobs, JobBatchID batch){
     JobBatchDescription jobBatch;
     getJobBatch(batch, &jobBatch);
 
@@ -230,7 +231,7 @@ static void wakeAdditionalWorkers(uint32 availableJobs){
 
 static uint32 processJobBatchIntoBuffer(JobBatchID batch, WorkerThreadID workerThreadId, JobPriority priority, JobID* outJobs, uint32 capacity){
     uint32 jobCount = 0;
-    struct batchSplit split = splitJobBatch(outJobs, capacity, batch, workerThreadId);
+    struct batchSplit split = splitJobBatch(outJobs, capacity, batch);
     jobCount = split.count; 
 
     // If batch was not fully consumed, store remainder as "working on"
@@ -337,8 +338,10 @@ JobID stealJobFromOtherThread(WorkerThreadID threadId, uint32* stealIndex, JobPr
 }
 
 bool32 waitForWork(WorkerThreadID threadId){
-    WorkerThread* thread = &state->threads[threadId];
+    (void)threadId;
+    //WorkerThread* thread = &state->threads[threadId];
     uint32 activeThreads = atomic_fetch_sub(&state->activeThreads, 1)-1;
+    (void)activeThreads;
     //avLog(AV_DEBUG_INFO, "Worker thread %u awaiting work. %u active threads", threadId, activeThreads);
     avSemaphoreWait(state->workPresent);
     atomic_fetch_add(&state->activeThreads, 1);
@@ -505,6 +508,7 @@ AV_API void jobFenceWait(JobFence fence){
 }
 
 int32 workerThreadEntry(byte* data, uint64 size){
+    (void)data;
     WorkerThreadID threadId = (WorkerThreadID) size;
     WorkerThread* thread = &state->threads[threadId];
     thread->id = avThreadGetID();
@@ -644,7 +648,7 @@ void processBatchCompletion(JobBatchID id){
     //     return;
     // }else
     {
-        doFreeJob:
+        //doFreeJob:
         freeJobBatch(id);
         atomic_fetch_sub(&state->allWorkDoneFence.workLeft, 1);
     }

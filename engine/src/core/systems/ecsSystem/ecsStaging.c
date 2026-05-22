@@ -34,6 +34,7 @@ static void addNewMemoryToFreeList(CommandBuffer* buf, uint32 oldCapacity, uint3
     }
 }
 
+__attribute__((unused))
 static void fillFastCache(CommandBuffer* buf, uint32 class) {
     // only valid for cached classes
     if (class >= FAST_CLASS_COUNT) return;
@@ -133,6 +134,7 @@ static void freeCommandBlock(CommandBuffer* buf, uint32 offset, uint32 class){
     buf->freeList[class] = offset;
 }
 
+__attribute__((unused))
 static void growCommandList(CommandBuffer* buf, CommandList* list){
     uint32 newCapacity = list->capacity + 1;
     uint32 newOffset = allocateCommandBlock(buf, newCapacity);
@@ -231,19 +233,20 @@ static void resetCommandBuffer(CommandBuffer* buf){
     *((uint32*)&buf->commandMem[0]) = __UINT32_MAX__;
 }
 
-static void initCommandList(CommandBuffer* buf, CommandList* list){
+static void initCommandList(CommandList* list){
     list->capacity = __UINT32_MAX__;
     list->count = 0;
     list->commands = __UINT32_MAX__;
 }
 
-static void initCommandBucket(CommandBuffer* buffer, CommandBucket* bucket){
+static void initCommandBucket(CommandBucket* bucket){
     for(uint32 i = 0; i < MAX_COMPONENT_COUNT; i++){
-        initCommandList(buffer, &bucket->commands[i]);
+        initCommandList(&bucket->commands[i]);
     }
     bucket->mask = (ComponentMask){0};
 }
 
+__attribute__((unused))
 static void drainFastCacheClass(CommandBuffer* buf, uint32 class) {
     if (class >= FAST_CLASS_COUNT) return;
 
@@ -258,17 +261,17 @@ static void drainFastCacheClass(CommandBuffer* buf, uint32 class) {
     }
 }
 
-static void drainAllFastCaches(CommandBuffer* buf) {
-    for (uint32 class = 0; class < FAST_CLASS_COUNT; class++) {
-        drainFastCacheClass(buf, class);
-    }
-}
+// static void drainAllFastCaches(CommandBuffer* buf) {
+//     for (uint32 class = 0; class < FAST_CLASS_COUNT; class++) {
+//         drainFastCacheClass(buf, class);
+//     }
+// }
 
-static void fillAllFastCaches(CommandBuffer* buf){
-    for (uint32 class = 0; class < FAST_CLASS_COUNT; class++) {
-        fillFastCache(buf, class);
-    }
-}
+// static void fillAllFastCaches(CommandBuffer* buf){
+//     for (uint32 class = 0; class < FAST_CLASS_COUNT; class++) {
+//         fillFastCache(buf, class);
+//     }
+// }
 
 static void resetFastCache(CommandBuffer* buf){
     for (uint32 i = 0; i < FAST_CLASS_COUNT; i++) {
@@ -322,9 +325,9 @@ static void commandSubmit(CommandBuffer* buffer, CommandType type, ComponentType
 }
 
 void commandBufferReset(CommandBuffer* buffer){
-    initCommandBucket(buffer, &buffer->addCommands);
-    initCommandBucket(buffer, &buffer->removeCommands);
-    initCommandList(buffer, &buffer->destroyCommands);
+    initCommandBucket(&buffer->addCommands);
+    initCommandBucket(&buffer->removeCommands);
+    initCommandList(&buffer->destroyCommands);
     resetFastCache(buffer);
     resetCommandBuffer(buffer);
     dataBlobReset(buffer);
@@ -341,9 +344,7 @@ void commandBufferDestroy(CommandBuffer* buffer){
     dataBlobDeinit(buffer);
 }
 
-void cmdEntityAddComponent(Scene scene, CommandBuffer* buffer, Entity entity, ComponentType type, void* constructorData, uint32 constructorDataSize){
-    (void)scene;
-    
+void cmdEntityAddComponent(CommandBuffer* buffer, Entity entity, ComponentType type, void* constructorData, uint32 constructorDataSize){
     uint32 offset = dataBlobStore(buffer, constructorDataSize, constructorData);
 
     Command command = {
@@ -354,20 +355,21 @@ void cmdEntityAddComponent(Scene scene, CommandBuffer* buffer, Entity entity, Co
     commandSubmit(buffer, CMD_COMPONENT_ADD, type, command);
 }
 
-void cmdEntityRemoveComponent(Scene scene, CommandBuffer* buffer, Entity entity, ComponentType type){
+void cmdEntityRemoveComponent(CommandBuffer* buffer, Entity entity, ComponentType type){
     Command command = {
         .entityId = entity,
     };
     commandSubmit(buffer, CMD_COMPONENT_REMOVE, type, command);
 }
 
-void cmdEntityDestroy(Scene scene, CommandBuffer* buffer, Entity entity){
+void cmdEntityDestroy(CommandBuffer* buffer, Entity entity){
     Command command = {
         .entityId = entity,
     };
     commandSubmit(buffer, CMD_ENTITY_DESTROY, 0, command);
 }
 
+__attribute__((unused))
 static Entity findLowestEntityID(CommandBuffer* buffers, uint32 threadCount, uint32*** indices, uint32* destroyIndices){
     Entity entity = INVALID_ENTITY;
     for(uint32 t = 0; t < threadCount; t++){
@@ -526,17 +528,17 @@ void applyCommandBuffers(Scene scene, CommandBuffer* buffers, uint32 threadCount
     uint32 headCount = 0;
 
 
-    uint32 addCommands = 0;
-    uint32 removeCommands = 0;
-    uint32 destroyCommands = 0;
-    for(uint32 i = 0; i < threadCount; i++){
-        CommandBuffer* buffer = buffers + i;
-        for(uint32 j = 0; j < MAX_COMPONENT_COUNT; j++){
-            addCommands += buffer->addCommands.commands[j].count;
-            removeCommands += buffer->removeCommands.commands[j].count;
-        }
-        destroyCommands += buffer->destroyCommands.count;
-    }
+    // uint32 addCommands = 0;
+    // uint32 removeCommands = 0;
+    // uint32 destroyCommands = 0;
+    // for(uint32 i = 0; i < threadCount; i++){
+    //     CommandBuffer* buffer = buffers + i;
+    //     for(uint32 j = 0; j < MAX_COMPONENT_COUNT; j++){
+    //         addCommands += buffer->addCommands.commands[j].count;
+    //         removeCommands += buffer->removeCommands.commands[j].count;
+    //     }
+    //     destroyCommands += buffer->destroyCommands.count;
+    // }
     //avDebug("%u add, %u remove, %u destroy", addCommands, removeCommands, destroyCommands);
 
     collectStreamHeads(buffers, threadCount, heads, &headCount);

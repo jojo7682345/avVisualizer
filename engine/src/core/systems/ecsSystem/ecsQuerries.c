@@ -20,6 +20,8 @@ bool32 isQuerrySelected(SelectionAccessCriteria criteria, ComponentMask mask){
 }
 
 static JobControl chunkDispatch(byte* input, uint32 inputSize, byte* output, uint32 outputSize, JobContext* context){
+    (void)inputSize;
+    (void)outputSize;
     System* system = (System*) input;
     SystemChunk* chunk = (SystemChunk*) output;
     JobControl control = system->process(system->scene, system->ctx, chunk->entityCount, chunk->entities, chunk->componentData, context);
@@ -29,7 +31,7 @@ static JobControl chunkDispatch(byte* input, uint32 inputSize, byte* output, uin
     return control;
 }
 
-JobBatchID dispatchChunksFromSystemPtr(Scene scene, System* system, uint32 chunkCount, SystemChunk* chunks, JobFence fence, uint32 dependencyCount, JobBatchID* dependencies){
+JobBatchID dispatchChunksFromSystemPtr(System* system, uint32 chunkCount, SystemChunk* chunks, JobFence fence, uint32 dependencyCount, JobBatchID* dependencies){
     JobBatchDescription batch = {
         .size = chunkCount,
         .flags.priority = JOB_PRIORITY_MEDIUM,
@@ -52,7 +54,7 @@ JobBatchID dispatchChunks(Scene scene, EcsSystemID systemID, uint32 chunkCount, 
         avError("Tried to access invalid system");
         return JOB_BATCH_NONE;
     }
-    return dispatchChunksFromSystemPtr(scene, system, chunkCount, chunks, fence, dependencyCount, dependencies);
+    return dispatchChunksFromSystemPtr(system, chunkCount, chunks, fence, dependencyCount, dependencies);
 }
 
 EcsSystemID createSystem(Scene scene, SelectionAccessCriteria selection, SystemExecution execution, SystemProcessFn process, void* ctx){
@@ -82,11 +84,11 @@ void destroySystem(Scene scene, EcsSystemID system){
         return;
     }
     unregisterSystemFromEntityTypes(scene, system);
-    destroySystemFromPtr(scene, sys);
+    destroySystemFromPtr(sys);
     MAPPING_REMOVE(scene->systems, system);
 }
 
-void destroySystemFromPtr(Scene scene, System* sys){
+void destroySystemFromPtr(System* sys){
     LIST_FREE(sys->entityTypes);
 }
 
@@ -248,7 +250,7 @@ void sceneRunSystems(Scene scene, JobFence systemFence){
         if(system->dispatchOverride){
             batches[index] = system->dispatchOverride(scene, system->ctx, system->process, counts[index], scene->systemChunkMem + offsets[index], systemFence, dependencyCount, dependencies);
         }else{
-            batches[index] = dispatchChunksFromSystemPtr(scene, system, counts[index], scene->systemChunkMem + offsets[index], systemFence, dependencyCount, dependencies);
+            batches[index] = dispatchChunksFromSystemPtr(system, counts[index], scene->systemChunkMem + offsets[index], systemFence, dependencyCount, dependencies);
         }
     }
 }

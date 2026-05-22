@@ -70,7 +70,7 @@ typedef struct IoState {
     AvSemaphore workPresent;
     AvSemaphore threadsExited;
     _Atomic bool32 allowNewRequests;
-    bool32 running;
+    _Atomic bool32 running;
     AvRwLock exitLock;
     void* queueMem;
 
@@ -223,6 +223,7 @@ bool8 initializeIoSystem(uint64* memoryRequirements, void* statePtr, void* confi
 }
 
 void deinitializeIoSystem(void* statePtr){
+    (void)statePtr;
     if(state==NULL) return;
     avRWLockWriteLock(state->exitLock);
     atomic_store_explicit(&state->running, 0, memory_order_release);
@@ -245,6 +246,8 @@ void deinitializeIoSystem(void* statePtr){
 }
 
 static JobControl ioProcess(byte* input, uint32 inputSize, byte* output, uint32 outputSize, JobContext* context){
+    (void)output;
+    (void)outputSize;
     IoRequest* request = (IoRequest*)input;
     uint32 index = inputSize;
 
@@ -257,6 +260,7 @@ static JobControl ioProcess(byte* input, uint32 inputSize, byte* output, uint32 
         case JOB_YIELD:
         case JOB_STATE_OVERRUN:
             request->result = IO_PROCESS_ERROR;
+            __attribute__((fallthrough));
         case JOB_EXIT_NORMAL:
             submitComplete(index);
             break;
@@ -303,7 +307,7 @@ static void processRequest(IoRequest* request, uint32 index){
     }
     if(request->mode == IO_MODE_READ){
         if(request->size == 0){
-            uint64 size;
+            int64 size;
             if((size = lseek(fd, 0, SEEK_END)) < 0){
                 request->result = IO_FILE_ERROR;
                 close(fd);
@@ -327,7 +331,7 @@ static void processRequest(IoRequest* request, uint32 index){
         }
         
 
-        uint64 bytesToRead = request->size;
+        int64 bytesToRead = request->size;
         byte* bytes = (void*) request->data;
         while(bytesToRead){
             int64 bytesRead = read(fd, bytes, bytesToRead);
@@ -394,7 +398,9 @@ submitComplete:
     }
 }
 
-static int32 ioThreadEntry(byte*,uint64 index){
+static int32 ioThreadEntry(byte* data,uint64 size){
+    (void)data;
+    (void)size;
     while(true){
 
         avSemaphoreWait(state->workPresent);
@@ -463,7 +469,7 @@ bool32 submitIoWrite(const char* path, const void* data, uint64 dataSize, IoWrit
     switch(flags){
         case IO_WRITE_FLAG_WRITE_NORMAL: request->mode = IO_MODE_WRITE; break;
         case IO_WRITE_FLAG_APPEND: request->mode = IO_MODE_APPEND; break;
-        case IO_WRITE_FLAG_WRITE_NEW: request->mode = IO_MODE_WRITE_NEW;
+        case IO_WRITE_FLAG_WRITE_NEW: request->mode = IO_MODE_WRITE_NEW; break;
         default: avError("Invalid IO write flag"); return false;
     }
     request->onComplete = onComplete;

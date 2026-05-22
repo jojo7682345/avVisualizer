@@ -216,6 +216,7 @@ bool8 avLogAddSink(AvLogSinkFn fn, void* userData){
 #include <stdlib.h>
 
 static void logInternal(AvResult result, uint64 line, const char* file, const char* func, const char* category, const char* fmt, va_list args){
+    (void)func;
     if(!logger.initialized) return;
 
     AvLogMessage msg;
@@ -223,7 +224,8 @@ static void logInternal(AvResult result, uint64 line, const char* file, const ch
     msg.result = result;
     msg.line = line;
     msg.file = file;
-    msg.category = category;
+    avStringPrintfToBuffer(msg.category, sizeof(msg.category), AV_CSTR("%s"), category);
+    msg.category[sizeof(msg.category)-1] = 0;
     msg.timestamp = platformGetAbsoluteTime() - loggingStart;
     msg.threadId = avThreadGetID();
 
@@ -235,7 +237,7 @@ static void logInternal(AvResult result, uint64 line, const char* file, const ch
     avConditionVariableSignal(logger.cond);
     avMutexUnlock(logger.condMutex);
 
-    if(result >= logger.assertLevel){
+    if(result >= (AvResult)logger.assertLevel){
         avLogShutdown();
         abort();
         debug_break();
@@ -323,7 +325,7 @@ void avLogVulkan(
     ...
 ) {
     (void)type;
-
+    (void)level;
     va_list args;
     va_start(args, fmt);
 

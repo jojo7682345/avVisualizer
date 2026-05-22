@@ -4,6 +4,7 @@
 #include <AvUtils/avMemory.h>
 #include <AvUtils/avThreading.h>
 
+#include "logging.h"
 #include "platform.h"
 #include "core/systems/event.h"
 #include "core/systems/input.h"
@@ -105,6 +106,10 @@ bool8 systemsInitialize(EngineConfig* config){
     uint64 totalMemSize = 0;
     for(uint32 i = 0; i < sizeof(engineSystems)/sizeof(EngineSystem); i++){
         uint64 memSize = 0;
+        if(engineSystems[i].initialize==NULL){
+            avError("Ivalid system initialize function");
+            return false;
+        }
         if(!engineSystems[i].initialize(&memSize, NULL, engineSystems[i].config)){
             avError("System failed to initialize");
             return false;
@@ -146,8 +151,8 @@ bool8 engineRun(EngineConfig* game_inst){
     clockUpdate(&engineState->clock);
     engineState->last_time = engineState->clock.elapsed;
 
-    double targetFrameSeconds = 1.0f / 120.0f;
-    double frameElapsedTime = 0;
+    //double targetFrameSeconds = 1.0f / 120.0f;
+    //double frameElapsedTime = 0;
 
     if(!systemsInitialize(game_inst)){
         avFree(engineState);
@@ -174,7 +179,7 @@ bool8 engineRun(EngineConfig* game_inst){
         clockUpdate(&engineState->clock);
         double current_time = engineState->clock.elapsed;
         double delta = (current_time - engineState->last_time);
-        double frame_start_time = platformGetAbsoluteTime();
+        //double frame_start_time = platformGetAbsoluteTime();
 
         if(engineState->currentScene) sceneRunSystems(engineState->currentScene, frameFence);
         

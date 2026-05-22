@@ -21,7 +21,9 @@ Allocator initAllocatorBase(void* ctx, AllocatorDispatch dispatch, Allocator* up
 #define ADRESS_ALLOCATOR_ADDRESS_SIZE (32 * _1TB)
 
 static AllocationResult regionAllocatorDispatch(Allocator* self, AllocationRequest request){
-
+    (void)self;
+    (void)request;
+    return (AllocationResult){.success=0};
 }
 
 AV_API bool8 initMemorySystem(MemorySystemConfig config){

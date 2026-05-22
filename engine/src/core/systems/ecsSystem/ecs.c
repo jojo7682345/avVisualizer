@@ -1,6 +1,6 @@
 #include "ecsInternal.h"
 #include "ecsStaging.h"
-#include "ecsQuerries.h"
+//#include "ecsQuerries.h"
 
 #include "containers/darray.h"
 #include "containers/idMapping.h"
@@ -83,7 +83,7 @@ void modifyEntityID(Scene scene, Entity entity, LocalEntity localEntity, bool32 
         return;
     }
     scene->entityTable[index] = localEntity;
-    scene->entityGeneration[index] = (~(ENTITY_STAGED_BIT)>>24) & scene->entityGeneration[index] | (isStaged << 7);
+    scene->entityGeneration[index] = ((~(ENTITY_STAGED_BIT)>>24) & scene->entityGeneration[index]) | (isStaged << 7);
 
     avRWLockReadUnlock(scene->entityIdLock);
 }
@@ -161,6 +161,7 @@ static void initChunkPool(){
 }
 
 static uint32 allocateChunk(Scene scene){
+    (void)scene;
     if(chunkPool.initialized==false){
         initChunkPool();
     }
@@ -333,7 +334,6 @@ static uint32 createChunk(EntityType* type){
     chunk->entityType = type->typeID;
     ITERATE_MASK(mask, component){
         uint32 size = getComponentSize(component);
-        bool32 isArray = false;
         chunk->components[component] = (Component) { avAllocate((size!=0 ? size*CHUNK_CAPACITY : 1), "") };
         //avDebug("Alloc %u", chunkID);
         avMemset(chunk->components[component], 0, size);
@@ -414,8 +414,8 @@ static bool32 destroyEntityTypeChunks(EntityType* type){
     if(index >= scene->entityTypeCount) return false;
     if(scene->entityTypes + index != type) return false;
 
-    uint32 lastIndex = scene->entityTypeCount - 1;
-    EntityTypeID lastID = scene->entityTypeReference[lastIndex];
+    //uint32 lastIndex = scene->entityTypeCount - 1;
+    //EntityTypeID lastID = scene->entityTypeReference[lastIndex];
     
     uint32 chunkCount = type->chunkCount;
     for(uint32 i = 0; i < chunkCount; i++){
@@ -425,6 +425,7 @@ static bool32 destroyEntityTypeChunks(EntityType* type){
     type->chunkCount = 0;
     if(type->chunks) avFree(type->chunks);
     LIST_FREE(type->systems);
+    return true;
 }
 
 static void unregisterEntityTypeFromSystems(Scene scene, EntityType* type){
@@ -450,7 +451,7 @@ void unregisterSystemFromEntityTypes(Scene scene, EcsSystemID id){
         EntityType* type = getEntityType(scene, *t);
         LIST_FOR_I(type->systems, i){
             EcsSystemID sysId = LIST_GET(type->systems, EcsSystemID, i);
-            if(sysId = id){
+            if(sysId == id){
                 LIST_SWAP_POP(type->systems, i);
                 break;
             }
@@ -561,7 +562,7 @@ AV_API void sceneDestroy(Scene scene){
     }
     MAPPING_DESTROY(scene->stagingBuffers);
     for(uint32 i = 0; i < MAPPING_SIZE(scene->systems); i++){
-        destroySystemFromPtr(scene, scene->systems + i);
+        destroySystemFromPtr(scene->systems + i);
     }
     MAPPING_DESTROY(scene->systems);
     darrayDestroy(scene->systemChunkMem);
@@ -721,18 +722,18 @@ bool32 moveEntity(Scene scene, Entity src, LocalEntity dst){
     ComponentMask dstC = dstType->mask;
 
     ComponentMask srcInvC = componentMaskInvert(srcC);
-    ComponentMask dstInvC = componentMaskInvert(dstC);
+    //ComponentMask dstInvC = componentMaskInvert(dstC);
 
     
     
-    ComponentMask compToNone = componentMaskAnd(srcC, dstInvC);
+    // ComponentMask compToNone = componentMaskAnd(srcC, dstInvC);
     ComponentMask compToComp = componentMaskAnd(srcC, dstC);
     ComponentMask noneToComp = componentMaskAnd(dstC, srcInvC);
 
     ComponentMask rawCopy = compToComp;
     ComponentMask zeroMem = noneToComp;
 
-    ComponentMask mask = componentMaskOr(srcC, dstC);
+    //ComponentMask mask = componentMaskOr(srcC, dstC);
 
     ITERATE_MASK(rawCopy, component){
         uint32 size = getComponentSize(component);
@@ -742,7 +743,7 @@ bool32 moveEntity(Scene scene, Entity src, LocalEntity dst){
     }
     ITERATE_MASK(zeroMem, component){
         uint32 size = getComponentSize(component);
-        byte* srcOffset = ((byte*)srcChunk->components[component]) + srcIndex*size;
+        //byte* srcOffset = ((byte*)srcChunk->components[component]) + srcIndex*size;
         byte* dstOffset = ((byte*)dstChunk->components[component]) + dstIndex*size;
         avMemset(dstOffset, 0 , size);
     }
@@ -805,14 +806,14 @@ void performConstructorMasked(Scene scene, uint32 i, EntityChunk* chunk, EntityT
 
     uint32 entityIndex = chunk->localIndex[i];
 
-    uint32 index = 0;
+    //uint32 index = 0;
     ITERATE_MASK(mask, component){
         uint32 size = getComponentSize(component);
         byte* base = (byte*) chunk->components[component];
         void* comp = base + entityIndex * size;
         avMemset(comp, 0, size);
         createComponent(scene, chunk->entities[entityIndex], comp, component, constructorData[component], constructorDataSize[component]);
-        index++;
+        //index++;
     }
 }
 
@@ -838,8 +839,10 @@ bool32 removeEntity(Scene scene, Entity entity, EntityChunk* chunk, EntityType* 
             destroyEntityType(scene, type);
         }
     }
+    return true;
 }
 
+__attribute__((unused))
 static bool32 destroyEntity(Scene scene, Entity entity){
     EntityChunk* chunk = getEntityChunk(scene, entity);
     if(chunk==NULL) return false;
@@ -974,19 +977,19 @@ AV_API Entity entityCreate(Scene scene){
 
 AV_API bool32 entityAddComponent(Scene scene, Entity entity, ComponentType type, void* constructorData, uint32 constructorDataSize){
     AvThreadID threadId = avThreadGetID();
-    cmdEntityAddComponent(scene, getStagingBuffer(scene, threadId), entity, type, constructorData, constructorDataSize);
+    cmdEntityAddComponent(getStagingBuffer(scene, threadId), entity, type, constructorData, constructorDataSize);
     return true;
 }
 
 AV_API bool32 entityRemoveComponent(Scene scene, Entity entity, ComponentType component){
     AvThreadID threadId = avThreadGetID();
-    cmdEntityRemoveComponent(scene, getStagingBuffer(scene, threadId), entity, component);
+    cmdEntityRemoveComponent( getStagingBuffer(scene, threadId), entity, component);
     return true;
 }
 
 AV_API bool32 entityDestroy(Scene scene, Entity entity){
     AvThreadID threadId = avThreadGetID();
-    cmdEntityDestroy(scene, getStagingBuffer(scene, threadId), entity);
+    cmdEntityDestroy(getStagingBuffer(scene, threadId), entity);
     return true;
 }
 
@@ -1032,7 +1035,7 @@ AV_API void* entityGetComponent(Scene scene, Entity entity, ComponentType compon
 void* entityGetComponentFast(Scene scene, Entity entity, ComponentType component){
     AvThreadID threadId = avThreadGetID();
     if(threadId!=AV_MAIN_THREAD_ID) return NULL;
-    EntityType* type = getType(scene, entity);
+    //EntityType* type = getType(scene, entity);
     EntityChunk* chunk = getEntityChunk(scene, entity);
     uint32 localIndex = getEntityLocalIndex(scene, entity);
     uint32 size = getComponentSize(component);

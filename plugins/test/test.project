@@ -1,0 +1,59 @@
+import global "std/c/stdc.project" {
+    buildExecutable as build;
+    recompile;
+    getSourceFiles;
+    requiresRelink;
+    linkExecutable;
+    requiresRecompile;
+}
+
+var additionalDependencies = [
+    "./test.project",
+];
+
+var engineDir = "../../engine/";
+
+func clean(){
+	deleteDir("build");
+    deleteDir("bin");
+}
+
+func test(){
+	var libflags=[
+        "-ggdb",
+        "-MMD",
+        "-fpic",
+        "-rdynamic",
+        "-Wextra",
+        "-fno-strict-aliasing",
+        "-Wall",
+    ];
+    var includes=[
+        engineDir + "include",
+        engineDir + "src",
+    ];
+    var libDirs=[
+    ];
+    var libs=[
+        "m",
+        "avUtils",
+    ];
+    var srcDir = [
+        "."
+    ];
+    var libName = "";
+    var libLnkName = "";
+    if(PLATFORM=="WINDOWS"){
+        libName = PROJECT_NAME + ".dll";
+    }else if(PLATFORM=="LINUX"){
+        libName = "lib" + PROJECT_NAME + ".so";
+    }
+
+    println("started compilation of engine");
+    var objects = recompile(getSourceFiles(srcDir), "build", libflags, includes, additionalDependencies); 
+    if(requiresRelink("bin/"+libName, objects, additionalDependencies)){
+        makeDir("bin");
+        linkExecutable(objects, "bin", libName, libflags + ["--shared"], libDirs, libs);
+    }
+    println("complation of test plugin complete");
+}

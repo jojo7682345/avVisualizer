@@ -88,3 +88,8 @@ AV_API MemoryRegion platformReserveMemory(uint64 size);
 AV_API bool32 platformCommitMemory(void* ptr, uint64 size);
 AV_API bool32 platformDecommitMemory(void* ptr, uint64 size);
 AV_API void platformReleaseMemory(MemoryRegion region);
+
+typedef struct Plugin Plugin;
+AV_API Plugin* platformLoadPlugin(const char* pluginName, const void* data, uint64 size);
+AV_API void* platformLoadPluginSymbol(Plugin* plugin, const char* symbol);
+AV_API void platformUnloadPlugin(Plugin* plugin);

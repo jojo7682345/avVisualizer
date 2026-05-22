@@ -153,4 +153,4 @@ uint32 getLocalEntityLocalIndex(LocalEntity localEntity);
 EntityType* getEntityType(Scene scene, EntityTypeID type);
 uint32 getComponentIndex(EntityType* type, ComponentType component);
 
-void destroySystemFromPtr(Scene scene, System* sys);
+void destroySystemFromPtr(System* sys);
