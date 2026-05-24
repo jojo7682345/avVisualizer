@@ -15,6 +15,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <time.h>
 
 #include "core/plugins/plugin.h"
 
@@ -44,34 +45,51 @@ bool32 isX11(){
     return getenv("DISPLAY") != NULL;
 }
 
+static inline bool8 loadSymbol(void** dest, Plugin* plugin, const char* name){
+	void* sym = platformLoadPluginSymbol(plugin, name);
+	if(sym == NULL){
+		avError("Failed to load symbol %s", name);
+		return false;
+	}
+	*dest = sym;
+	return true;
+}
+
 bool8 platformSystemStartup(uint64* memoryRequirement, void* state, void* config) {
 	if(backend.plugin==NULL){
 		if (isWayland()) {
 			loadPlugin(wayland_backend, backend.plugin);
 			if(backend.plugin==NULL) return false;
-			void (*mainFunc)() = platformLoadPluginSymbol(backend.plugin, "waylandPluginMain");
-			mainFunc();
+			if(!loadSymbol((void**)&backend.startup, backend.plugin, "waylandBackendInitialize")) return false;
+			if(!loadSymbol((void**)&backend.shutdown, backend.plugin, "waylandBackendShutdown")) return false;
 		} else if (isX11()) {
 			return false;
 		} else {
 			return false;
 		}
 	}
-	return false;
-    //return backend.startup(memoryRequirement, state, config);
+	return backend.startup(memoryRequirement, state, config);
 }
 
 
 void platformSystemShutdown(void* platformState){
-	(void)platformState;
+	backend.shutdown(platformState);
 }
 
 bool8 platformPumpMessages(void){
 	return false;
 }
 
-double platformGetAbsoluteTime(void){
-	return 0.0;
+double platformGetAbsoluteTime(void) {
+    struct timespec ts;
+
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+
+    return (double)ts.tv_sec + (double)ts.tv_nsec * 1e-9;
+}
+
+AV_API void platformSleep(uint64 ms){
+	usleep(ms*1000);
 }
 
 AV_API uint64 platformGetPageSize(){

@@ -160,6 +160,9 @@ bool8 avLogInit(const AvLogConfig* config){
 
     avThreadCreate(logThreadMain, &logger.logThread);
     avThreadStart(NULL, 0, logger.logThread);
+    platformSleep(1);
+    avWarn("TODO: Fix the queue submission race condition");
+    // this is due to the logging thread reading the queue before the message is done writing
     return true;
 }
 
@@ -218,7 +221,11 @@ bool8 avLogAddSink(AvLogSinkFn fn, void* userData){
 static void logInternal(AvResult result, uint64 line, const char* file, const char* func, const char* category, const char* fmt, va_list args){
     (void)func;
     if(!logger.initialized) return;
-
+    if(result == AV_SUCCESS){
+        for(uint32 i = 0; i < 3; i++){
+            debug_break();
+        }
+    }
     AvLogMessage msg;
     avMemset(&msg, 0, sizeof(msg));
     msg.result = result;
@@ -282,9 +289,12 @@ void avLogConsoleSink(const AvLogMessage* msg, void* userData) {
         (msg->result & AV_WARNING) ? AV_COLOR_YELLOW :
         (msg->result & AV_INFO) ? AV_COLOR_CYAN :
         (msg->result & AV_DEBUG) ? AV_COLOR_BLUE : AV_COLOR_GREEN;
-
+    FILE* output = stdout;
+    if(msg->result > AV_WARNING){
+        output = stderr;
+    }
     if(avCStringLength(msg->category)==0){
-        printf("["COLOR"%s"COLOR"] %g %s\n",
+        fprintf(output, "["COLOR"%s"COLOR"] %g %s\n",
             color,
             level,
             AV_COLOR_RESET,
@@ -292,7 +302,7 @@ void avLogConsoleSink(const AvLogMessage* msg, void* userData) {
             msg->text
         );
     }else{
-        printf("["COLOR"%s"COLOR"] %g [%s] %s\n",
+        fprintf(output, "["COLOR"%s"COLOR"] %g [%s] %s\n",
             color,
             level,
             AV_COLOR_RESET,

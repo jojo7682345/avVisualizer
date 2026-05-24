@@ -40,23 +40,23 @@ void platformGetFramebufferSize(uint32* width, uint32* height);
  */
 bool8 platformPumpMessages(void);
 
-/**
- * @brief Performs platform-specific printing to the console of the given
- * message and colour code (if supported).
- *
- * @param message The message to be printed.
- * @param colour The colour to print the text in (if supported).
- */
-void platformConsoleWrite(const char* message, uint8 colour);
+// /**
+//  * @brief Performs platform-specific printing to the console of the given
+//  * message and colour code (if supported).
+//  *
+//  * @param message The message to be printed.
+//  * @param colour The colour to print the text in (if supported).
+//  */
+// void platformConsoleWrite(const char* message, uint8 colour);
 
-/**
- * @brief Performs platform-specific printing to the error console of the given
- * message and colour code (if supported).
- *
- * @param message The message to be printed.
- * @param colour The colour to print the text in (if supported).
- */
-void platformConsoleWriteError(const char* message, uint8 colour);
+// /**
+//  * @brief Performs platform-specific printing to the error console of the given
+//  * message and colour code (if supported).
+//  *
+//  * @param message The message to be printed.
+//  * @param colour The colour to print the text in (if supported).
+//  */
+// void platformConsoleWriteError(const char* message, uint8 colour);
 
 /**
  * @brief Gets the absolute time since the application started.
