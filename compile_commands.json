@@ -16,187 +16,177 @@
 	},
 	{
 		"directory": "/win/shared/usr/avVisualizer",
-		"command": "gcc -c engine/src/containers/darray.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -Iplugins -I/Include -o build/engine/src/containers/darray.o",
+		"command": "gcc -c engine/src/containers/darray.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -Wall -Wextra -fno-strict-aliasing -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -I./ -I/Include -o build/engine/src/containers/darray.o",
 		"file": "engine/src/containers/darray.c"
 	},
 	{
 		"directory": "/win/shared/usr/avVisualizer",
-		"command": "gcc -c engine/src/containers/idMapping.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -Iplugins -I/Include -o build/engine/src/containers/idMapping.o",
+		"command": "gcc -c engine/src/containers/idMapping.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -Wall -Wextra -fno-strict-aliasing -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -I./ -I/Include -o build/engine/src/containers/idMapping.o",
 		"file": "engine/src/containers/idMapping.c"
 	},
 	{
 		"directory": "/win/shared/usr/avVisualizer",
-		"command": "gcc -c engine/src/containers/listpool.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -Iplugins -I/Include -o build/engine/src/containers/listpool.o",
+		"command": "gcc -c engine/src/containers/listpool.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -Wall -Wextra -fno-strict-aliasing -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -I./ -I/Include -o build/engine/src/containers/listpool.o",
 		"file": "engine/src/containers/listpool.c"
 	},
 	{
 		"directory": "/win/shared/usr/avVisualizer",
-		"command": "gcc -c engine/src/containers/queues/mpmcQueue.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -Iplugins -I/Include -o build/engine/src/containers/queues/mpmcQueue.o",
+		"command": "gcc -c engine/src/containers/queues/mpmcQueue.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -Wall -Wextra -fno-strict-aliasing -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -I./ -I/Include -o build/engine/src/containers/queues/mpmcQueue.o",
 		"file": "engine/src/containers/queues/mpmcQueue.c"
 	},
 	{
 		"directory": "/win/shared/usr/avVisualizer",
-		"command": "gcc -c engine/src/core/engine.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -Iplugins -I/Include -o build/engine/src/core/engine.o",
+		"command": "gcc -c engine/src/core/engine.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -Wall -Wextra -fno-strict-aliasing -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -I./ -I/Include -o build/engine/src/core/engine.o",
 		"file": "engine/src/core/engine.c"
 	},
 	{
 		"directory": "/win/shared/usr/avVisualizer",
-		"command": "gcc -c engine/src/core/platform/linux/wayland.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -Iplugins -I/Include -o build/engine/src/core/platform/linux/wayland.o",
-		"file": "engine/src/core/platform/linux/wayland.c"
-	},
-	{
-		"directory": "/win/shared/usr/avVisualizer",
-		"command": "gcc -c engine/src/core/platform/linux/x11.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -Iplugins -I/Include -o build/engine/src/core/platform/linux/x11.o",
-		"file": "engine/src/core/platform/linux/x11.c"
-	},
-	{
-		"directory": "/win/shared/usr/avVisualizer",
-		"command": "gcc -c engine/src/core/platform/platformLinux.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -Iplugins -I/Include -o build/engine/src/core/platform/platformLinux.o",
+		"command": "gcc -c engine/src/core/platform/platformLinux.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -Wall -Wextra -fno-strict-aliasing -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -I./ -I/Include -o build/engine/src/core/platform/platformLinux.o",
 		"file": "engine/src/core/platform/platformLinux.c"
 	},
 	{
 		"directory": "/win/shared/usr/avVisualizer",
-		"command": "gcc -c engine/src/core/platform/platformWin32.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -Iplugins -I/Include -o build/engine/src/core/platform/platformWin32.o",
+		"command": "gcc -c engine/src/core/platform/platformWin32.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -Wall -Wextra -fno-strict-aliasing -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -I./ -I/Include -o build/engine/src/core/platform/platformWin32.o",
 		"file": "engine/src/core/platform/platformWin32.c"
 	},
 	{
 		"directory": "/win/shared/usr/avVisualizer",
-		"command": "gcc -c engine/src/core/plugins/plugin.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -Iplugins -I/Include -o build/engine/src/core/plugins/plugin.o",
+		"command": "gcc -c engine/src/core/plugins/plugin.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -Wall -Wextra -fno-strict-aliasing -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -I./ -I/Include -o build/engine/src/core/plugins/plugin.o",
 		"file": "engine/src/core/plugins/plugin.c"
 	},
 	{
 		"directory": "/win/shared/usr/avVisualizer",
-		"command": "gcc -c engine/src/core/systems/ecsSystem/ecs.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -Iplugins -I/Include -o build/engine/src/core/systems/ecsSystem/ecs.o",
+		"command": "gcc -c engine/src/core/systems/ecsSystem/ecs.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -Wall -Wextra -fno-strict-aliasing -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -I./ -I/Include -o build/engine/src/core/systems/ecsSystem/ecs.o",
 		"file": "engine/src/core/systems/ecsSystem/ecs.c"
 	},
 	{
 		"directory": "/win/shared/usr/avVisualizer",
-		"command": "gcc -c engine/src/core/systems/ecsSystem/ecsQuerries.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -Iplugins -I/Include -o build/engine/src/core/systems/ecsSystem/ecsQuerries.o",
+		"command": "gcc -c engine/src/core/systems/ecsSystem/ecsQuerries.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -Wall -Wextra -fno-strict-aliasing -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -I./ -I/Include -o build/engine/src/core/systems/ecsSystem/ecsQuerries.o",
 		"file": "engine/src/core/systems/ecsSystem/ecsQuerries.c"
 	},
 	{
 		"directory": "/win/shared/usr/avVisualizer",
-		"command": "gcc -c engine/src/core/systems/ecsSystem/ecsStaging.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -Iplugins -I/Include -o build/engine/src/core/systems/ecsSystem/ecsStaging.o",
+		"command": "gcc -c engine/src/core/systems/ecsSystem/ecsStaging.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -Wall -Wextra -fno-strict-aliasing -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -I./ -I/Include -o build/engine/src/core/systems/ecsSystem/ecsStaging.o",
 		"file": "engine/src/core/systems/ecsSystem/ecsStaging.c"
 	},
 	{
 		"directory": "/win/shared/usr/avVisualizer",
-		"command": "gcc -c engine/src/core/systems/ecsSystem/frameData.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -Iplugins -I/Include -o build/engine/src/core/systems/ecsSystem/frameData.o",
+		"command": "gcc -c engine/src/core/systems/ecsSystem/frameData.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -Wall -Wextra -fno-strict-aliasing -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -I./ -I/Include -o build/engine/src/core/systems/ecsSystem/frameData.o",
 		"file": "engine/src/core/systems/ecsSystem/frameData.c"
 	},
 	{
 		"directory": "/win/shared/usr/avVisualizer",
-		"command": "gcc -c engine/src/core/systems/eventSystem/event.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -Iplugins -I/Include -o build/engine/src/core/systems/eventSystem/event.o",
+		"command": "gcc -c engine/src/core/systems/eventSystem/event.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -Wall -Wextra -fno-strict-aliasing -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -I./ -I/Include -o build/engine/src/core/systems/eventSystem/event.o",
 		"file": "engine/src/core/systems/eventSystem/event.c"
 	},
 	{
 		"directory": "/win/shared/usr/avVisualizer",
-		"command": "gcc -c engine/src/core/systems/inputSystem/intput.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -Iplugins -I/Include -o build/engine/src/core/systems/inputSystem/intput.o",
+		"command": "gcc -c engine/src/core/systems/inputSystem/intput.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -Wall -Wextra -fno-strict-aliasing -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -I./ -I/Include -o build/engine/src/core/systems/inputSystem/intput.o",
 		"file": "engine/src/core/systems/inputSystem/intput.c"
 	},
 	{
 		"directory": "/win/shared/usr/avVisualizer",
-		"command": "gcc -c engine/src/core/systems/ioSystem/ioRequests.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -Iplugins -I/Include -o build/engine/src/core/systems/ioSystem/ioRequests.o",
+		"command": "gcc -c engine/src/core/systems/ioSystem/ioRequests.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -Wall -Wextra -fno-strict-aliasing -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -I./ -I/Include -o build/engine/src/core/systems/ioSystem/ioRequests.o",
 		"file": "engine/src/core/systems/ioSystem/ioRequests.c"
 	},
 	{
 		"directory": "/win/shared/usr/avVisualizer",
-		"command": "gcc -c engine/src/core/systems/jobSystem/jobBatchPool.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -Iplugins -I/Include -o build/engine/src/core/systems/jobSystem/jobBatchPool.o",
+		"command": "gcc -c engine/src/core/systems/jobSystem/jobBatchPool.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -Wall -Wextra -fno-strict-aliasing -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -I./ -I/Include -o build/engine/src/core/systems/jobSystem/jobBatchPool.o",
 		"file": "engine/src/core/systems/jobSystem/jobBatchPool.c"
 	},
 	{
 		"directory": "/win/shared/usr/avVisualizer",
-		"command": "gcc -c engine/src/core/systems/jobSystem/jobQueue.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -Iplugins -I/Include -o build/engine/src/core/systems/jobSystem/jobQueue.o",
+		"command": "gcc -c engine/src/core/systems/jobSystem/jobQueue.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -Wall -Wextra -fno-strict-aliasing -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -I./ -I/Include -o build/engine/src/core/systems/jobSystem/jobQueue.o",
 		"file": "engine/src/core/systems/jobSystem/jobQueue.c"
 	},
 	{
 		"directory": "/win/shared/usr/avVisualizer",
-		"command": "gcc -c engine/src/core/systems/jobSystem/jobs.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -Iplugins -I/Include -o build/engine/src/core/systems/jobSystem/jobs.o",
+		"command": "gcc -c engine/src/core/systems/jobSystem/jobs.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -Wall -Wextra -fno-strict-aliasing -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -I./ -I/Include -o build/engine/src/core/systems/jobSystem/jobs.o",
 		"file": "engine/src/core/systems/jobSystem/jobs.c"
 	},
 	{
 		"directory": "/win/shared/usr/avVisualizer",
-		"command": "gcc -c engine/src/core/systems/logSystem/logging.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -Iplugins -I/Include -o build/engine/src/core/systems/logSystem/logging.o",
+		"command": "gcc -c engine/src/core/systems/logSystem/logging.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -Wall -Wextra -fno-strict-aliasing -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -I./ -I/Include -o build/engine/src/core/systems/logSystem/logging.o",
 		"file": "engine/src/core/systems/logSystem/logging.c"
 	},
 	{
 		"directory": "/win/shared/usr/avVisualizer",
-		"command": "gcc -c engine/src/core/utils/allocators/allocator.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -Iplugins -I/Include -o build/engine/src/core/utils/allocators/allocator.o",
+		"command": "gcc -c engine/src/core/utils/allocators/allocator.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -Wall -Wextra -fno-strict-aliasing -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -I./ -I/Include -o build/engine/src/core/utils/allocators/allocator.o",
 		"file": "engine/src/core/utils/allocators/allocator.c"
 	},
 	{
 		"directory": "/win/shared/usr/avVisualizer",
-		"command": "gcc -c engine/src/core/utils/allocators/arenaAllocator.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -Iplugins -I/Include -o build/engine/src/core/utils/allocators/arenaAllocator.o",
+		"command": "gcc -c engine/src/core/utils/allocators/arenaAllocator.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -Wall -Wextra -fno-strict-aliasing -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -I./ -I/Include -o build/engine/src/core/utils/allocators/arenaAllocator.o",
 		"file": "engine/src/core/utils/allocators/arenaAllocator.c"
 	},
 	{
 		"directory": "/win/shared/usr/avVisualizer",
-		"command": "gcc -c engine/src/core/utils/allocators/core/bumpAllocator.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -Iplugins -I/Include -o build/engine/src/core/utils/allocators/core/bumpAllocator.o",
+		"command": "gcc -c engine/src/core/utils/allocators/core/bumpAllocator.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -Wall -Wextra -fno-strict-aliasing -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -I./ -I/Include -o build/engine/src/core/utils/allocators/core/bumpAllocator.o",
 		"file": "engine/src/core/utils/allocators/core/bumpAllocator.c"
 	},
 	{
 		"directory": "/win/shared/usr/avVisualizer",
-		"command": "gcc -c engine/src/core/utils/allocators/core/routerAllocator.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -Iplugins -I/Include -o build/engine/src/core/utils/allocators/core/routerAllocator.o",
+		"command": "gcc -c engine/src/core/utils/allocators/core/routerAllocator.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -Wall -Wextra -fno-strict-aliasing -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -I./ -I/Include -o build/engine/src/core/utils/allocators/core/routerAllocator.o",
 		"file": "engine/src/core/utils/allocators/core/routerAllocator.c"
 	},
 	{
 		"directory": "/win/shared/usr/avVisualizer",
-		"command": "gcc -c engine/src/core/utils/allocators/core/vmAllocator.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -Iplugins -I/Include -o build/engine/src/core/utils/allocators/core/vmAllocator.o",
+		"command": "gcc -c engine/src/core/utils/allocators/core/vmAllocator.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -Wall -Wextra -fno-strict-aliasing -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -I./ -I/Include -o build/engine/src/core/utils/allocators/core/vmAllocator.o",
 		"file": "engine/src/core/utils/allocators/core/vmAllocator.c"
 	},
 	{
 		"directory": "/win/shared/usr/avVisualizer",
-		"command": "gcc -c engine/src/core/utils/clock.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -Iplugins -I/Include -o build/engine/src/core/utils/clock.o",
+		"command": "gcc -c engine/src/core/utils/clock.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -Wall -Wextra -fno-strict-aliasing -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -I./ -I/Include -o build/engine/src/core/utils/clock.o",
 		"file": "engine/src/core/utils/clock.c"
 	},
 	{
 		"directory": "/win/shared/usr/avVisualizer",
-		"command": "gcc -c engine/src/core/utils/matrix.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -Iplugins -I/Include -o build/engine/src/core/utils/matrix.o",
+		"command": "gcc -c engine/src/core/utils/matrix.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -Wall -Wextra -fno-strict-aliasing -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -I./ -I/Include -o build/engine/src/core/utils/matrix.o",
 		"file": "engine/src/core/utils/matrix.c"
 	},
 	{
 		"directory": "/win/shared/usr/avVisualizer",
-		"command": "gcc -c engine/src/core/utils/spinRwLock.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -Iplugins -I/Include -o build/engine/src/core/utils/spinRwLock.o",
+		"command": "gcc -c engine/src/core/utils/spinRwLock.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -Wall -Wextra -fno-strict-aliasing -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -I./ -I/Include -o build/engine/src/core/utils/spinRwLock.o",
 		"file": "engine/src/core/utils/spinRwLock.c"
 	},
 	{
 		"directory": "/win/shared/usr/avVisualizer",
-		"command": "gcc -c engine/src/renderer/shaders/shaders.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -Iplugins -I/Include -o build/engine/src/renderer/shaders/shaders.o",
+		"command": "gcc -c engine/src/renderer/shaders/shaders.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -Wall -Wextra -fno-strict-aliasing -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -I./ -I/Include -o build/engine/src/renderer/shaders/shaders.o",
 		"file": "engine/src/renderer/shaders/shaders.c"
 	},
 	{
 		"directory": "/win/shared/usr/avVisualizer",
-		"command": "gcc -c engine/src/renderer/shaders/spirv-reflect/spirv_reflect.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -Iplugins -I/Include -o build/engine/src/renderer/shaders/spirv-reflect/spirv_reflect.o",
+		"command": "gcc -c engine/src/renderer/shaders/spirv-reflect/spirv_reflect.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -Wall -Wextra -fno-strict-aliasing -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -I./ -I/Include -o build/engine/src/renderer/shaders/spirv-reflect/spirv_reflect.o",
 		"file": "engine/src/renderer/shaders/spirv-reflect/spirv_reflect.c"
 	},
 	{
 		"directory": "/win/shared/usr/avVisualizer",
-		"command": "gcc -c engine/src/renderer/vulkan/renderer.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -Iplugins -I/Include -o build/engine/src/renderer/vulkan/renderer.o",
+		"command": "gcc -c engine/src/renderer/vulkan/renderer.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -Wall -Wextra -fno-strict-aliasing -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -I./ -I/Include -o build/engine/src/renderer/vulkan/renderer.o",
 		"file": "engine/src/renderer/vulkan/renderer.c"
 	},
 	{
 		"directory": "/win/shared/usr/avVisualizer",
-		"command": "gcc -c engine/src/renderer/vulkan/vulkanPlatformWin32.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -Iplugins -I/Include -o build/engine/src/renderer/vulkan/vulkanPlatformWin32.o",
+		"command": "gcc -c engine/src/renderer/vulkan/vulkanPlatformWin32.c -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -Wall -Wextra -fno-strict-aliasing -rdynamic -Iengine/include -Iengine/include/imgui -Iengine/src -Iengine/src/renderer/shaders/spirv-reflect/include -Ishaders/include -I./ -I/Include -o build/engine/src/renderer/vulkan/vulkanPlatformWin32.o",
 		"file": "engine/src/renderer/vulkan/vulkanPlatformWin32.c"
 	},
 	{
-		"directory": "/win/shared/usr/avVisualizer/plugins/test",
-		"command": "gcc -c ./test.c -ggdb -MMD -fpic -rdynamic -I../../engine/include -I../../engine/src -o build/./test.o",
-		"file": "./test.c"
+		"directory": "/win/shared/usr/avVisualizer/plugins/wayland-backend",
+		"command": "gcc -c ./wayland-backend.c -ggdb -MMD -fpic -rdynamic -Wextra -fno-strict-aliasing -Wall -I../../engine/include -I../../engine/src -o build/./wayland-backend.o",
+		"file": "./wayland-backend.c"
 	},
 	{
-		"directory": "/win/shared/usr/avVisualizer/plugins/test",
-		"command": "gcc -ggdb -MMD -fpic -rdynamic --shared build/./test.o  -lm -lavUtils -o bin/libtest.so",
+		"directory": "/win/shared/usr/avVisualizer/plugins/wayland-backend",
+		"command": "gcc -ggdb -MMD -fpic -rdynamic -Wextra -fno-strict-aliasing -Wall --shared build/./wayland-backend.o  -lm -lavUtils -o bin/libwayland-backend.so",
 		"file": "(unkown)"
 	},
 	{
 		"directory": "/win/shared/usr/avVisualizer",
-		"command": "ld -r -b binary plugins/test/bin/libtest.so -o build/plugins/test.o",
+		"command": "ld -r -b binary plugins/wayland-backend/bin/libwayland-backend.so -o build/plugins/wayland-backend.o",
 		"file": "(unkown)"
 	},
 	{
 		"directory": "/win/shared/usr/avVisualizer",
-		"command": "gcc -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -rdynamic --shared -Wl,--out-implib=bin/libavVisualizer.a -shared-libgcc build/engine/src/containers/darray.o build/engine/src/containers/idMapping.o build/engine/src/containers/listpool.o build/engine/src/containers/queues/mpmcQueue.o build/engine/src/core/engine.o build/engine/src/core/platform/linux/wayland.o build/engine/src/core/platform/linux/x11.o build/engine/src/core/platform/platformLinux.o build/engine/src/core/platform/platformWin32.o build/engine/src/core/plugins/plugin.o build/engine/src/core/systems/ecsSystem/ecs.o build/engine/src/core/systems/ecsSystem/ecsQuerries.o build/engine/src/core/systems/ecsSystem/ecsStaging.o build/engine/src/core/systems/ecsSystem/frameData.o build/engine/src/core/systems/eventSystem/event.o build/engine/src/core/systems/inputSystem/intput.o build/engine/src/core/systems/ioSystem/ioRequests.o build/engine/src/core/systems/jobSystem/jobBatchPool.o build/engine/src/core/systems/jobSystem/jobQueue.o build/engine/src/core/systems/jobSystem/jobs.o build/engine/src/core/systems/logSystem/logging.o build/engine/src/core/utils/allocators/allocator.o build/engine/src/core/utils/allocators/arenaAllocator.o build/engine/src/core/utils/allocators/core/bumpAllocator.o build/engine/src/core/utils/allocators/core/routerAllocator.o build/engine/src/core/utils/allocators/core/vmAllocator.o build/engine/src/core/utils/clock.o build/engine/src/core/utils/matrix.o build/engine/src/core/utils/spinRwLock.o build/engine/src/renderer/shaders/shaders.o build/engine/src/renderer/shaders/spirv-reflect/spirv_reflect.o build/engine/src/renderer/vulkan/renderer.o build/engine/src/renderer/vulkan/vulkanPlatformWin32.o build/plugins/test.o -L/Lib -lm -lavUtils -lshaderc_shared -lvulkan -lstdc++ -o bin/libavVisualizer.so",
+		"command": "gcc -ggdb -MMD -DAV_EXPORT -DAV_DEBUG_ALLOC -fpic -Wall -Wextra -fno-strict-aliasing -rdynamic --shared -Wl,--out-implib=bin/libavVisualizer.a -shared-libgcc build/engine/src/containers/darray.o build/engine/src/containers/idMapping.o build/engine/src/containers/listpool.o build/engine/src/containers/queues/mpmcQueue.o build/engine/src/core/engine.o build/engine/src/core/platform/platformLinux.o build/engine/src/core/platform/platformWin32.o build/engine/src/core/plugins/plugin.o build/engine/src/core/systems/ecsSystem/ecs.o build/engine/src/core/systems/ecsSystem/ecsQuerries.o build/engine/src/core/systems/ecsSystem/ecsStaging.o build/engine/src/core/systems/ecsSystem/frameData.o build/engine/src/core/systems/eventSystem/event.o build/engine/src/core/systems/inputSystem/intput.o build/engine/src/core/systems/ioSystem/ioRequests.o build/engine/src/core/systems/jobSystem/jobBatchPool.o build/engine/src/core/systems/jobSystem/jobQueue.o build/engine/src/core/systems/jobSystem/jobs.o build/engine/src/core/systems/logSystem/logging.o build/engine/src/core/utils/allocators/allocator.o build/engine/src/core/utils/allocators/arenaAllocator.o build/engine/src/core/utils/allocators/core/bumpAllocator.o build/engine/src/core/utils/allocators/core/routerAllocator.o build/engine/src/core/utils/allocators/core/vmAllocator.o build/engine/src/core/utils/clock.o build/engine/src/core/utils/matrix.o build/engine/src/core/utils/spinRwLock.o build/engine/src/renderer/shaders/shaders.o build/engine/src/renderer/shaders/spirv-reflect/spirv_reflect.o build/engine/src/renderer/vulkan/renderer.o build/engine/src/renderer/vulkan/vulkanPlatformWin32.o build/plugins/wayland-backend.o -L/Lib -lm -lavUtils -lshaderc_shared -lvulkan -lstdc++ -o bin/libavVisualizer.so",
 		"file": "(unkown)"
 	},
 	{

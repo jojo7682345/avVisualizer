@@ -107,7 +107,7 @@ func buildPlugins(){
             continue;
         }else{
             println("Bulding plugin: " + plugin);
-            runFunctionFromProject(projectFile, plugin);
+            runFunctionFromProject(projectFile, "main");
         }
         
 
@@ -151,7 +151,7 @@ func buildLib(){
         "engine/src",
         "engine/src/renderer/shaders/spirv-reflect/include",
         "shaders/include",
-        "plugins",
+        "./",
         "$#VULKAN_SDK/Include",
     ];
     var libDirs=[
@@ -238,7 +238,7 @@ func buildTest(){
 
 
 
-func avVisualizer() {
+func main() {
     runFunctionFromProject("./tools/shaderEmbed/shaderEmbed.project", "shaderEmbed");
     if(!buildShaders()){
         println("Failed to build shaders");
@@ -249,7 +249,7 @@ func avVisualizer() {
 }
 
 func runTests(){
-    avVisualizer();
+    main();
 
 
     var libflags=[

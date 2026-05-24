@@ -8,7 +8,7 @@ import global "std/c/stdc.project" {
 }
 
 var additionalDependencies = [
-    "./test.project",
+    "./wayland-backend.project",
 ];
 
 var engineDir = "../../engine/";
@@ -18,7 +18,7 @@ func clean(){
     deleteDir("bin");
 }
 
-func test(){
+func main(){
 	var libflags=[
         "-ggdb",
         "-MMD",
@@ -36,10 +36,10 @@ func test(){
     ];
     var libs=[
         "m",
-        "avUtils",
+        "wayland-client",
     ];
     var srcDir = [
-        "."
+        "src"
     ];
     var libName = "";
     var libLnkName = "";

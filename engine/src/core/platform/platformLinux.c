@@ -5,12 +5,7 @@
 #include <AvUtils/avMemory.h>
 #include <AvUtils//avString.h>
 
-
 #include <dlfcn.h>
-
-#include "platformLinux.h"
-#include "linux/wayland.h"
-#include "linux/x11.h"
 
 #include <unistd.h>
 #define _GNU_SOURCE
@@ -22,9 +17,17 @@
 #include <string.h>
 
 #include "core/plugins/plugin.h"
-#include "test/test.h"
 
-static PlatformBackend backend = {0};
+typedef struct PlatformBackendPlugin {
+	Plugin* plugin;
+    bool8 (*startup)(uint64* memoryRequirement, void* state, PlatformConfig* config);
+    void (*shutdown)(void* state);
+
+    void (*getFramebufferSize)(uint32* w, uint32* h);
+    bool8 (*pumpMessages)(void);
+} PlatformBackendPlugin;
+
+static PlatformBackendPlugin backend = {0};
 
 __attribute__((unused))
 static void* platform_state;
@@ -32,10 +35,8 @@ static void* platform_state;
 bool32 isWayland(){
     const char *xdg_session_type = getenv("XDG_SESSION_TYPE");
     if (xdg_session_type && strcmp(xdg_session_type, "wayland") == 0) return true;
-
     const char *wayland_display = getenv("WAYLAND_DISPLAY");
     if (wayland_display) return true;
-
     return false;
 }
 
@@ -44,26 +45,20 @@ bool32 isX11(){
 }
 
 bool8 platformSystemStartup(uint64* memoryRequirement, void* state, void* config) {
-	if(backend.initialized==false){
+	if(backend.plugin==NULL){
 		if (isWayland()) {
-			Plugin* plugin;
-			loadPlugin(test, plugin);
-			typeof(testPluginTest)* testFunc = platformLoadPluginSymbol(plugin, "testPluginTest");
-			if(testFunc==NULL){
-				avError("Failed to load test func");
-				return false;
-			}else{
-				testFunc();
-			}
-			platformUnloadPlugin(plugin);
-			return false;
+			loadPlugin(wayland_backend, backend.plugin);
+			if(backend.plugin==NULL) return false;
+			void (*mainFunc)() = platformLoadPluginSymbol(backend.plugin, "waylandPluginMain");
+			mainFunc();
 		} else if (isX11()) {
-			
+			return false;
 		} else {
 			return false;
 		}
 	}
-    return backend.startup(memoryRequirement, state, config);
+	return false;
+    //return backend.startup(memoryRequirement, state, config);
 }
 
 
@@ -143,7 +138,6 @@ AV_API Plugin* platformLoadPlugin(const char* name, const void* data, uint64 siz
 	
 	Plugin* plugin = (Plugin*) dlopen(path, RTLD_NOW | RTLD_LOCAL);
 	if(plugin == NULL){
-		printf("%s", dlerror());
 		close(fd);
 		avFree(plugin);
 		return NULL;
