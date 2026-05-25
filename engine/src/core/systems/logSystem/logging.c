@@ -1,5 +1,7 @@
 #include "logging.h"
 
+#include <AvUtils/avMath.h>
+#include <AvUtils/avTypes.h>
 #include <stdatomic.h>
 #include <AvUtils/avThreading.h>
 #include <AvUtils/threading/avConditionVariable.h>
@@ -7,20 +9,11 @@
 #include <AvUtils/avString.h>
 
 #include "core/platform.h"
+#include "containers/queues/mpmcQueue.h"
 
-typedef struct AvLogQueue {
-    AvLogMessage* buffer;
-    uint32 size;
-
-    // producer side (atomic)
-    _Atomic uint32 writeIndex;
-
-    // consumer side (single thread)
-    uint32 readIndex;
-} AvLogQueue;
 
 typedef struct AvLogger {
-    AvLogQueue queue;
+    MpmcQueue queue;
 
     AvLogSink sinks[AV_MAX_SINKS];
     uint32 sinkCount;
@@ -57,32 +50,21 @@ const char* AV_COLOR_CYAN =     "";
 const char* AV_COLOR_WHITE =    "";
 const char* AV_COLOR_RESET =    "";
 
-static bool8 queueInit(AvLogQueue* queue, uint32 size){
-    queue->buffer = (AvLogMessage*)avCallocate(size, sizeof(AvLogMessage), "");
-    queue->size = size;
-    atomic_store_explicit(&queue->writeIndex, 0, memory_order_release);
-    queue->readIndex = 0;
+static bool8 queueInit(MpmcQueue* queue, uint32 size){
+    void* buffer = avCallocate(size, sizeof(AvLogMessage), "");
+    void* secBuffer = avCallocate(size, sizeof(uint32), "");
+    size = nextPow2(size);
+    mpmcInit(queue, size, sizeof(AvLogMessage), buffer, secBuffer);
+
     return true;
 }
 
-static bool8 queuePush(AvLogQueue* queue, const AvLogMessage* msg){
-    uint32 write = atomic_fetch_add_explicit(&queue->writeIndex, 1, memory_order_relaxed);
-    uint32 index = write & (queue->size - 1);
-
-    queue->buffer[index] = *msg;
-    return true;
+static bool8 queuePush(MpmcQueue* queue, const AvLogMessage* msg){
+    return mpmcPush(queue, (void*)msg);
 }
 
-static bool32 queuePop(AvLogQueue* queue, AvLogMessage* out){
-    uint32 read = queue->readIndex;
-    uint32 write = atomic_load_explicit(&queue->writeIndex, memory_order_acquire);
-
-    if(read == write) return false;
-
-    uint32 index = read & (queue->size -1);
-    *out = queue->buffer[index];
-    queue->readIndex++;
-    return true;
+static bool32 queuePop(MpmcQueue* queue, AvLogMessage* out){
+    return mpmcPop(queue, out);
 }
 
 static void dispatch(const AvLogMessage* msg){
@@ -161,8 +143,6 @@ bool8 avLogInit(const AvLogConfig* config){
     avThreadCreate(logThreadMain, &logger.logThread);
     avThreadStart(NULL, 0, logger.logThread);
     platformSleep(1);
-    avWarn("TODO: Fix the queue submission race condition");
-    // this is due to the logging thread reading the queue before the message is done writing
     return true;
 }
 
@@ -176,8 +156,9 @@ void avLogShutdown(){
 
     avThreadJoin(logger.logThread);
 
-    if(logger.queue.buffer){
-        avFree(logger.queue.buffer);
+    if(logger.queue.data){
+        avFree(logger.queue.data);
+        avFree(logger.queue.seq);
     }
 
     avThreadDestroy(logger.logThread);
@@ -294,7 +275,7 @@ void avLogConsoleSink(const AvLogMessage* msg, void* userData) {
         output = stderr;
     }
     if(avCStringLength(msg->category)==0){
-        fprintf(output, "["COLOR"%s"COLOR"] %g %s\n",
+        fprintf(output, "["COLOR"%s"COLOR"] %.3g %s\n",
             color,
             level,
             AV_COLOR_RESET,
@@ -302,7 +283,7 @@ void avLogConsoleSink(const AvLogMessage* msg, void* userData) {
             msg->text
         );
     }else{
-        fprintf(output, "["COLOR"%s"COLOR"] %g [%s] %s\n",
+        fprintf(output, "["COLOR"%s"COLOR"] %.3g [%s] %s\n",
             color,
             level,
             AV_COLOR_RESET,

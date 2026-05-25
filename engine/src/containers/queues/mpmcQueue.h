@@ -17,6 +17,6 @@ typedef struct MpmcQueue {
 
 #define MPMC_QUEUE_SEQUENCE_BUFFER_SIZE(elementCount) sizeof(uint32)*(elementCount) // elementCount must be power of 2
 
-bool32 mpmcInit(MpmcQueue* q, uint32 size, uint32 stride, void* backingBuffer, void* seqBuffer);
+bool32 mpmcInit(MpmcQueue* q, uint32 size, uint32 stride, void* backingBuffer, uint32* seqBuffer);
 bool32 mpmcPush(MpmcQueue* q, void* element);
 bool32 mpmcPop(MpmcQueue* q, void* outElement);

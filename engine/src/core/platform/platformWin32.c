@@ -12,6 +12,10 @@
 #include <windowsx.h>  // param input extraction
 #include <AvUtils/avLogging.h>
 
+#include "containers/darray.h"
+#define VK_USE_PLATFORM_WIN32_KHR
+#include <vulkan/vulkan.h>
+
 typedef struct Win32HandleInfo {
     HINSTANCE instance;
     HWND hwnd;
@@ -410,6 +414,25 @@ AV_API void platformReleaseMemory(MemoryRegion region){
         0,
         MEM_RELEASE
     );
+}
+
+void vulkanPlatformGetRequiredExtensionNames(const char*** namesDarray) {
+	darrayPush(*namesDarray, &"VK_KHR_win32_surface");
+}
+
+bool32 vulkanPlatformCreateSurface(void* instance, void* surface){
+	VkWin32SurfaceCreateInfoKHR createInfo = {0};
+	createInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
+	createInfo.hinstance = state->handle.instance;
+	createInfo.hwnd = state->handle.hwnd;
+	createInfo.flags = 0;
+	VkResult result = VK_SUCCESS;
+	if((result = vkCreateWin32SurfaceKHR(*instance, &createInfo, NULL, surface)) != VK_SUCCESS){
+		avFatal("Unable to create surface");
+		return false;
+	}
+	return true;
+
 }
 
 

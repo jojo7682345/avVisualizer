@@ -23,4 +23,4 @@ void rendererDrawFrame();
 void rendererSignalResize();
 
 void vulkanPlatformGetRequiredExtensionNames(const char*** namesDarray);
-bool32 vulkanPlatformCreateSurface(void* rendererState, void* platformState, void* surface);
+bool32 vulkanPlatformCreateSurface(void* instance, void* surface);

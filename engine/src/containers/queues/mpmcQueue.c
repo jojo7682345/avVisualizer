@@ -1,7 +1,7 @@
 #include "mpmcQueue.h"
 #include <AvUtils/avMemory.h>
 
-bool32 mpmcInit(MpmcQueue* q, uint32 size, uint32 stride, void* backingBuffer, void* seqBuffer){
+bool32 mpmcInit(MpmcQueue* q, uint32 size, uint32 stride, void* backingBuffer, uint32* seqBuffer){
     if ((size & (size - 1)) != 0) return false;
 
     q->size = size;

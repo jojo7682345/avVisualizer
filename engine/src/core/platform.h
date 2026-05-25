@@ -93,3 +93,6 @@ typedef struct Plugin Plugin;
 AV_API Plugin* platformLoadPlugin(const char* pluginName, const void* data, uint64 size);
 AV_API void* platformLoadPluginSymbol(Plugin* plugin, const char* symbol);
 AV_API void platformUnloadPlugin(Plugin* plugin);
+
+void vulkanPlatformGetRequiredExtensionNames(const char*** namesDarray);
+bool32 vulkanPlatformCreateSurface(void* vkInstance, void* surface);
