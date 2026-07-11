@@ -11,3 +11,8 @@ static inline uint64 getMsbValue(uint64 x) {
     return 1ULL << getMsb(x);
 }
 
+static inline void* alignPtr(void* ptr, uint64 align){
+    uint64 p = (uint64)ptr;
+    uint64 aligned = (p + (align - 1)) & ~(align - 1);
+    return (void*)aligned;
+}

@@ -1,5 +1,6 @@
 #include "../jobs.h"
 
+#include "core/utils/math.h"
 #include "jobQueue.h"
 #include "jobsInternal.h"
 
@@ -12,9 +13,9 @@ JobSystemState* state = NULL;
 static void jobInstancePoolInit();
 int32 workerThreadEntry(byte* data, uint64 size);
 AV_API bool8 jobSystemInitialize(uint64* memoryRequirement, void* statePtr, void* configPtr){
-    *memoryRequirement = sizeof(JobSystemState);
+    *memoryRequirement = sizeof(JobSystemState) + _Alignof(JobSystemState);
     if(statePtr==NULL) return true;
-    state = (JobSystemState*) statePtr;
+    state = alignPtr(statePtr, _Alignof(JobSystemState));
     avMemset(state, 0, sizeof(JobSystemState));
 
     JobSystemConfig* config = (JobSystemConfig*) configPtr;

@@ -202,11 +202,11 @@ bool8 avLogAddSink(AvLogSinkFn fn, void* userData){
 static void logInternal(AvResult result, uint64 line, const char* file, const char* func, const char* category, const char* fmt, va_list args){
     (void)func;
     if(!logger.initialized) return;
-    if(result == AV_SUCCESS){
-        for(uint32 i = 0; i < 3; i++){
-            debug_break();
-        }
-    }
+    // if(result == AV_SUCCESS){
+    //     for(uint32 i = 0; i < 3; i++){
+    //         debug_break();
+    //     }
+    // }
     AvLogMessage msg;
     avMemset(&msg, 0, sizeof(msg));
     msg.result = result;

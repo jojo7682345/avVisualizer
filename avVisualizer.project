@@ -143,7 +143,8 @@ func buildLib(){
         "-Wall",
         "-Wextra",
         "-fno-strict-aliasing",
-        "-rdynamic"
+        "-rdynamic",
+        //"-fsanitize=address,undefined",
     ];
     var includes=[
         "engine/include",
@@ -194,7 +195,8 @@ func buildTest(){
         "-ggdb",
         "-MMD",
         "-DAV_DEBUG_ALLOC",
-        "-Wl,-rpath,\"\$ORIGIN\""
+        "-Wl,-rpath,\"\$ORIGIN\"",
+        //"-fsanitize=address,undefined",
     ];
     var includes=[
         "engine/include",
@@ -255,7 +257,8 @@ func runTests(){
     var libflags=[
         "-ggdb",
         "-MMD",
-        "-DAV_DEBUG_ALLOC"
+        "-DAV_DEBUG_ALLOC",
+        "-fsanitize=address,undefined",
     ];
     var includes=[
         "engine/include",

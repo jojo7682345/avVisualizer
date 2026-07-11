@@ -26,6 +26,9 @@ typedef struct PlatformBackendPlugin {
 
     void (*getFramebufferSize)(uint32* w, uint32* h);
     bool8 (*pumpMessages)(void);
+
+	void (*getVulkanRequiredExtensions)(const char*** namesDarray);
+	bool32 (*createVulkanSurface)(void* instance, void* surface);
 } PlatformBackendPlugin;
 
 static PlatformBackendPlugin backend = {0};
@@ -62,6 +65,8 @@ bool8 platformSystemStartup(uint64* memoryRequirement, void* state, void* config
 			if(backend.plugin==NULL) return false;
 			if(!loadSymbol((void**)&backend.startup, backend.plugin, "waylandBackendInitialize")) return false;
 			if(!loadSymbol((void**)&backend.shutdown, backend.plugin, "waylandBackendShutdown")) return false;
+			if(!loadSymbol((void**)&backend.getVulkanRequiredExtensions, backend.plugin, "waylandBackendGetVulkanRequiredExtensions")) return false;
+			if(!loadSymbol((void**)&backend.createVulkanSurface, backend.plugin, "waylandBackendCreateVulkanSurface")) return false;
 		} else if (isX11()) {
 			return false;
 		} else {
@@ -71,9 +76,18 @@ bool8 platformSystemStartup(uint64* memoryRequirement, void* state, void* config
 	return backend.startup(memoryRequirement, state, config);
 }
 
+void vulkanPlatformGetRequiredExtensionNames(const char*** namesDarray){
+	backend.getVulkanRequiredExtensions(namesDarray);
+}
+bool32 vulkanPlatformCreateSurface(void* vkInstance, void* surface){
+	return backend.createVulkanSurface(vkInstance, surface);
+}
+
 
 void platformSystemShutdown(void* platformState){
 	backend.shutdown(platformState);
+
+	platformUnloadPlugin(backend.plugin);
 }
 
 bool8 platformPumpMessages(void){

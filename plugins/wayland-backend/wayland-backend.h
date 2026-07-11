@@ -7,3 +7,7 @@ typedef struct WaylandBackendConfig{
 } WaylandBackendConfig;
 
 bool8 waylandBackendInitialize(uint64* memoryRequirements, void* statePtr, void* configPtr);
+void waylandBackendShutdown(void* statePtr);
+
+void waylandBackendGetVulkanRequiredExtensions(const char*** namesDarray);
+bool32 waylandBackendCreateVulkanSurface(void* instance, void* surface);

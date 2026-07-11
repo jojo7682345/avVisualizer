@@ -2,7 +2,7 @@
 #include "../event.h"
 #include "engine.h"
 #include <AvUtils/avMemory.h>
-
+#include "core/utils/math.h"
 typedef struct keyboard_state {
     bool8 keys[256];
 } keyboard_state;
@@ -31,12 +31,12 @@ static input_state* state;
 
 bool8 inputSystemInitialize(uint64* memory_requirement, void* statePtr, void* config) {
     (void)config;
-    *memory_requirement = sizeof(input_state);
+    *memory_requirement = sizeof(input_state) + _Alignof(input_state);
     if (statePtr == 0) {
         return true;
     }
     avMemset(statePtr, 0, sizeof(input_state));
-    state = statePtr;
+    state = alignPtr(statePtr, _Alignof(input_state));
 
     // Create the keymap stack and an active keymap to apply to.
     //stack_create(&state->keymap_stack, sizeof(keymap));

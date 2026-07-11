@@ -3,6 +3,7 @@
 #include <AvUtils/avLogging.h>
 #include <AvUtils/avMemory.h>
 #include <AvUtils/avThreading.h>
+#include <unistd.h>
 
 #include "logging.h"
 #include "platform.h"
@@ -71,9 +72,9 @@ EngineSystem engineSystems[] = {
     {.initialize=eventSystemInitialize,     .uninitialize=eventSystemShutdown,      .config=&eventConfig        },
     {.initialize=inputSystemInitialize,     .uninitialize=inputSystemShutdown,      .config=NULL                }, 
     {.initialize=platformSystemStartup,     .uninitialize=platformSystemShutdown,   .config=&platformConfig     },
-    //{.initialize=rendererStartup,           .uninitialize=rendererShutdown,         .config=&rendererConfig     },
     {.initialize=jobSystemInitialize,       .uninitialize=jobSystemDeinitialize,    .config=&jobsystemConfig    },
     {.initialize=initializeIoSystem,        .uninitialize=deinitializeIoSystem,     .config=&ioSystemConfig     },
+    {.initialize=rendererStartup,           .uninitialize=rendererShutdown,         .config=&rendererConfig     },
 };
 
 bool8 systemsInitialize(EngineConfig* config){
@@ -117,6 +118,7 @@ bool8 systemsInitialize(EngineConfig* config){
         totalMemSize += memSize;
     }
     engineState->systemsMemory = avAllocate(totalMemSize, "Allocating systems memory");
+    avMemset(engineState->systemsMemory, 0, totalMemSize);
     byte* memory = engineState->systemsMemory;
     for(uint32 i = 0; i < sizeof(engineSystems)/sizeof(EngineSystem); i++){
         uint64 memSize = 0;
@@ -214,6 +216,7 @@ bool8 engineRun(EngineConfig* game_inst){
     avFree(engineState);
 
     avLogShutdown();
+    
     return true;
 }
 

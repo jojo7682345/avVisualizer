@@ -1,4 +1,6 @@
 #include "../wayland-backend.h"
+#include <vulkan/vulkan_core.h>
+#include <vulkan/vulkan_wayland.h>
 #include <wayland-client-core.h>
 #include <wayland-client-protocol.h>
 #include <wayland-client.h>
@@ -11,6 +13,14 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+
+#include <containers/darray.h>
+
+#define VK_USE_PLATFORM_WAYLAND_KHR
+#include <vulkan/vulkan.h>
+
+#include <AvUtils/avMemory.h>
+#include "core/utils/math.h"
 
 typedef struct WaylandState {
 	struct wl_display* display; 
@@ -190,7 +200,7 @@ static const struct xdg_toplevel_listener toplevelListener = {
 
 
 bool8 waylandBackendInitialize(uint64* memoryRequirements, void* statePtr, void* configPtr){
-	*memoryRequirements = sizeof(WaylandState);
+	*memoryRequirements = sizeof(WaylandState) + _Alignof(WaylandState);
 	if(statePtr==NULL){
 		return true;
 	}
@@ -198,7 +208,9 @@ bool8 waylandBackendInitialize(uint64* memoryRequirements, void* statePtr, void*
 	if(config ==NULL) return false;
 
 
-	state = (WaylandState*)statePtr;
+	state = alignPtr((WaylandState*)statePtr, _Alignof(WaylandState));
+	avMemset(state, 0, sizeof(WaylandState));
+
 	state->display = wl_display_connect(NULL);
     state->registry = wl_display_get_registry(state->display);
 	wl_registry_add_listener(state->registry, &registry_listener, NULL);
@@ -222,6 +234,9 @@ bool8 waylandBackendInitialize(uint64* memoryRequirements, void* statePtr, void*
 
 void waylandBackendShutdown(void* statePtr){
 	(void)statePtr;
+	if(state->keyboard) wl_keyboard_destroy(state->keyboard);
+	if(state->seat) wl_seat_destroy(state->seat);
+
 	xdg_toplevel_destroy(state->toplevel);
 	xdg_surface_destroy(state->shellSurface);
 	wl_surface_destroy(state->surface);
@@ -229,4 +244,21 @@ void waylandBackendShutdown(void* statePtr){
 	wl_compositor_destroy(state->compositor);
 	wl_registry_destroy(state->registry);
 	wl_display_disconnect(state->display);
+}
+
+void waylandBackendGetVulkanRequiredExtensions(const char*** namesDarray){
+	
+	darrayPush(*namesDarray,(const char*) "VK_KHR_wayland_surface");
+}
+bool32 waylandBackendCreateVulkanSurface(void* instance, void* surface){
+	VkWaylandSurfaceCreateInfoKHR info = {
+		.sType = VK_STRUCTURE_TYPE_WAYLAND_SURFACE_CREATE_INFO_KHR,
+		.surface = state->surface,
+		.display = state->display,
+	};
+	if(vkCreateWaylandSurfaceKHR(instance, &info, NULL, surface) != VK_SUCCESS){
+		avError("Failed to create wayland surface");
+		return false;
+	}
+	return true;
 }

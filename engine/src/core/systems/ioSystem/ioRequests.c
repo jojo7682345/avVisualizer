@@ -10,6 +10,7 @@
 #include <AvUtils/threading/avRwLock.h>
 
 #include "containers/queues/mpmcQueue.h"
+#include "core/utils/math.h"
 #define AV_LOG_CATEGORY "IO"
 #include "logging.h"
 
@@ -145,9 +146,10 @@ void requestPoolFree(IoRequestPool* pool, uint32 index){
 
 static int32 ioThreadEntry(byte*,uint64 index);
 bool8 initializeIoSystem(uint64* memoryRequirements, void* statePtr, void* configPtr){
-    *memoryRequirements = sizeof(IoState);
+    *memoryRequirements = sizeof(IoState) + _Alignof(IoState);
     if(statePtr==NULL) return true;
-    state = statePtr;
+    state = alignPtr(statePtr, _Alignof(IoState));
+    avMemset(state, 0, sizeof(IoState));
     
     IoSystemConfig* config = (IoSystemConfig*)configPtr;
     uint32 queueSize = nextPowerOf2(config->concurrentRequests);
@@ -209,7 +211,7 @@ bool8 initializeIoSystem(uint64* memoryRequirements, void* statePtr, void* confi
     atomic_store_explicit(&state->running, 1, memory_order_release);
     for(uint32 i = 0; i < state->ioThreadCount; i++){
         avThreadCreate(ioThreadEntry, &state->ioThreads[i]);
-        char buffer[16];
+        char buffer[16] = {0};
         avStringPrintfToBuffer(buffer, sizeof(buffer), AV_CSTRA("IO thread %u"), i);
         avThreadSetName(state->ioThreads[i], buffer);
         avThreadStart(NULL, i, state->ioThreads[i]);

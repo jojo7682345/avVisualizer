@@ -3,6 +3,8 @@
 #include <AvUtils/avMemory.h>
 #include <AvUtils/threading/avMutex.h>
 #include <AvUtils/threading/avRwLock.h>
+#include "core/utils/allocator.h"
+#include "core/utils/math.h"
 
 #define EVENT_BATCH_SIZE 128
 #define EVENT_POOL_SIZE 512
@@ -18,7 +20,7 @@ typedef struct EventBatch {
 typedef struct EventPool {
     union{
         EventBatch batches[EVENT_POOL_SIZE];
-        struct __attribute__((aligned (sizeof(EventBatch)))) {
+        struct __attribute__((aligned (_Alignof(EventBatch)))) {
             EventID empty;
             uint32 nextEmptySlot;
         } slots[EVENT_POOL_SIZE];
@@ -63,7 +65,7 @@ static EventStageFn* eventStageBuffer = NULL;
 
 bool8 eventSystemInitialize(uint64* memory_requirement, void* statePtr, void* configPtr){
     EventSystemConfig* config = (EventSystemConfig*)configPtr;
-    *memory_requirement = sizeof(EventSystem);
+    *memory_requirement = sizeof(EventSystem) + _Alignof(EventBatch)-1;
     if(statePtr==NULL){
         return true;
     }
@@ -71,7 +73,8 @@ bool8 eventSystemInitialize(uint64* memory_requirement, void* statePtr, void* co
         return false;
     }
     avMemset(statePtr, 0, sizeof(EventSystem));
-    state = statePtr;
+    
+    state = alignPtr(statePtr, _Alignof(EventBatch));
 
     state->maxID = config->maxIDs;
     state->registeredEvents = avAllocate(sizeof(uint16)*state->maxID, "");

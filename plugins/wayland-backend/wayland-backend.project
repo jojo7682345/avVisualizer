@@ -27,6 +27,7 @@ func main(){
         "-Wextra",
         "-fno-strict-aliasing",
         "-Wall",
+        //"-fsanitize=address,undefined",
     ];
     var includes=[
         engineDir + "include",
