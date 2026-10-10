@@ -416,11 +416,11 @@ AV_API void platformReleaseMemory(MemoryRegion region){
     );
 }
 
-void vulkanPlatformGetRequiredExtensionNames(const char*** namesDarray) {
+void platformGetVulkanRequiredExtensionNames(const char*** namesDarray) {
 	darrayPush(*namesDarray, &"VK_KHR_win32_surface");
 }
 
-bool32 vulkanPlatformCreateSurface(void* instance, void* surface){
+bool32 platformCreateVulkanSurface(void* instance, void* surface){
 	VkWin32SurfaceCreateInfoKHR createInfo = {0};
 	createInfo.sType = VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR;
 	createInfo.hinstance = state->handle.instance;

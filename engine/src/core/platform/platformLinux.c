@@ -19,17 +19,24 @@
 
 #include "core/plugins/plugin.h"
 
+
+#define LIST_OF_BACKEND_FUNCTIONS \
+	BACKEND_FUNC(bool8, startup, uint64* memoryRequirement, void* state, PlatformConfig* config)\
+    BACKEND_FUNC(void, shutdown, void* state)\
+    BACKEND_FUNC(void, getFramebufferSize, uint32* w, uint32* h)\
+    BACKEND_FUNC(bool8, pumpMessages, void)\
+	BACKEND_FUNC(void, getVulkanRequiredExtensions, const char*** namesDarray)\
+	BACKEND_FUNC(bool32, createVulkanSurface, void* instance, void* surface, Window window)\
+	BACKEND_FUNC(Window, createWindow, uint32* x, uint32* y, uint32* width, uint32* height, const char* title)\
+	BACKEND_FUNC(void, destroyWindow, Window window)\
+
+#define BACKEND_FUNC(type, name, ...) type (*name) (__VA_ARGS__);
 typedef struct PlatformBackendPlugin {
 	Plugin* plugin;
-    bool8 (*startup)(uint64* memoryRequirement, void* state, PlatformConfig* config);
-    void (*shutdown)(void* state);
-
-    void (*getFramebufferSize)(uint32* w, uint32* h);
-    bool8 (*pumpMessages)(void);
-
-	void (*getVulkanRequiredExtensions)(const char*** namesDarray);
-	bool32 (*createVulkanSurface)(void* instance, void* surface);
+    LIST_OF_BACKEND_FUNCTIONS // main functions always required
+	// define optional functions here
 } PlatformBackendPlugin;
+#undef BACKEND_FUNC
 
 static PlatformBackendPlugin backend = {0};
 
@@ -63,10 +70,9 @@ bool8 platformSystemStartup(uint64* memoryRequirement, void* state, void* config
 		if (isWayland()) {
 			loadPlugin(wayland_backend, backend.plugin);
 			if(backend.plugin==NULL) return false;
-			if(!loadSymbol((void**)&backend.startup, backend.plugin, "waylandBackendInitialize")) return false;
-			if(!loadSymbol((void**)&backend.shutdown, backend.plugin, "waylandBackendShutdown")) return false;
-			if(!loadSymbol((void**)&backend.getVulkanRequiredExtensions, backend.plugin, "waylandBackendGetVulkanRequiredExtensions")) return false;
-			if(!loadSymbol((void**)&backend.createVulkanSurface, backend.plugin, "waylandBackendCreateVulkanSurface")) return false;
+			#define BACKEND_FUNC(type, name, ...) if(!loadSymbol((void**)&backend.name, backend.plugin, "waylandBackend_"#name)) return false;
+			LIST_OF_BACKEND_FUNCTIONS
+			#undef BACKEND_FUNC
 		} else if (isX11()) {
 			return false;
 		} else {
@@ -76,11 +82,18 @@ bool8 platformSystemStartup(uint64* memoryRequirement, void* state, void* config
 	return backend.startup(memoryRequirement, state, config);
 }
 
-void vulkanPlatformGetRequiredExtensionNames(const char*** namesDarray){
+void platformGetVulkanRequiredExtensionNames(const char*** namesDarray){
 	backend.getVulkanRequiredExtensions(namesDarray);
 }
-bool32 vulkanPlatformCreateSurface(void* vkInstance, void* surface){
-	return backend.createVulkanSurface(vkInstance, surface);
+bool32 platformCreateVulkanSurface(void* vkInstance, void* surface, Window window){
+	return backend.createVulkanSurface(vkInstance, surface, window);
+}
+
+AV_API Window platformCreateWindow(uint32* x, uint32* y, uint32* width, uint32* height, const char* title){
+	return backend.createWindow(x, y, width, height, title);
+}
+AV_API void platformDestroyWindow(Window window){
+	return backend.destroyWindow(window);
 }
 
 

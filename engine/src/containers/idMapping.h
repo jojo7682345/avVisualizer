@@ -1,6 +1,8 @@
 #pragma once
 #include "defines.h"
 
+#define MAPPING_INVALID_ID ((uint32)-1)
+
 bool32 idMappingCreate(void** mapping, uint32 stride, uint32 addressSize);
 bool32 idMappingDestroy(void** mapping);
 uint32 idMappingAdd(void** mapping, void* data);
@@ -19,3 +21,5 @@ uint32 idMappingGetId(void** mapping, uint32 index);
 #define MAPPING_SIZE(ptr) idMappingCount((void**)&(ptr))
 
 #define MAPPING_ID(ptr, index) idMappingGetId((void**)&(ptr), (index))
+
+#define IdMapping(type) type*

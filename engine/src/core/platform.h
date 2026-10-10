@@ -79,6 +79,12 @@ AV_API void platformSleep(uint64 ms);
 AV_API uint64 platformGetPageSize();
 AV_API uint64 platformGetAllocationGranularity();
 
+
+typedef struct Window* Window;
+
+AV_API Window platformCreateWindow(uint32* x, uint32* y, uint32* width, uint32* height, const char* title);
+AV_API void platformDestroyWindow(Window window);
+
 typedef struct MemoryRegion {
     uint64 size;
     void* ptr;
@@ -94,5 +100,5 @@ AV_API Plugin* platformLoadPlugin(const char* pluginName, const void* data, uint
 AV_API void* platformLoadPluginSymbol(Plugin* plugin, const char* symbol);
 AV_API void platformUnloadPlugin(Plugin* plugin);
 
-void vulkanPlatformGetRequiredExtensionNames(const char*** namesDarray);
-bool32 vulkanPlatformCreateSurface(void* vkInstance, void* surface);
+void platformGetVulkanRequiredExtensionNames(const char*** namesDarray);
+bool32 platformCreateVulkanSurface(void* vkInstance, void* surface, Window window);

@@ -1,3 +1,4 @@
+#include "logging.h"
 #include "renderer.h"
 #include "gpu.h"
 #include <AvUtils/avMemory.h>
@@ -216,6 +217,45 @@ static uint32 getUniqueQueueFamilies(const Gpu* gpu, uint32* families){
     return count;
 }
 
+bool32 querryGpus(Renderer* renderer, GpuRequirements requirements, GpuPreferences preferences){
+	uint32 deviceCount = 0;
+	vkEnumeratePhysicalDevices(renderer->instance.handle, &deviceCount, NULL);
+	if(deviceCount == 0){
+		avError("No vulkan capable devices present");
+		return false;
+	}
+	VkPhysicalDevice* devices = avAllocate(sizeof(VkPhysicalDevice)*deviceCount, "");
+	vkEnumeratePhysicalDevices(renderer->instance.handle, &deviceCount, devices);
+
+	uint32 suitableCount = 0;
+	Gpu* suitableDevices = avAllocate(sizeof(Gpu)*deviceCount, "");
+
+	int bestScore = 0;
+	uint32 bestGpu = {0};
+	for(uint32 i = 0; i < deviceCount; i++){
+		VkPhysicalDevice device = devices[i];
+		Gpu candidate;
+		int score = scoreGpu(device, requirements.surface, &requirements, &preferences, &candidate);
+		if(score > 0){
+			suitableDevices[suitableCount++] = candidate;
+		}
+		if(score > bestScore){
+			bestScore = score;
+			bestGpu = i;
+		}
+	}
+	if(suitableCount == 0){
+		avError("No suitable devices present");
+		avFree(suitableDevices);
+		avFree(devices);
+	}
+	avFree(devices);
+	renderer->devices = suitableDevices;
+	renderer->deviceCount = suitableCount;
+	renderer->gpu = &suitableDevices[bestGpu];
+	return true;
+}
+
 bool32 gpuSelect(Renderer* renderer, GpuRequirements requirements, GpuPreferences preferences, Gpu* gpu){
 	uint32 deviceCount = 0;
 	vkEnumeratePhysicalDevices(renderer->instance.handle, &deviceCount, NULL);
@@ -232,7 +272,7 @@ bool32 gpuSelect(Renderer* renderer, GpuRequirements requirements, GpuPreference
 	for(uint32 i = 0; i < deviceCount; i++){
 		VkPhysicalDevice device = devices[i];
 		Gpu candidate;
-		int score = scoreGpu(device, renderer->swapchain.surface, &requirements, &preferences, &candidate);
+		int score = scoreGpu(device, requirements.surface, &requirements, &preferences, &candidate);
 		if(score > bestScore){
 			bestScore = score;
 			bestDevice = device;
@@ -245,18 +285,18 @@ bool32 gpuSelect(Renderer* renderer, GpuRequirements requirements, GpuPreference
 		return false;
 	}
 	*gpu = bestGpu;
+	renderer->gpuRequirements = requirements;
 	return true;
 }
 
-bool32 gpuConnect(Renderer* renderer, GpuRequirements requirements, Gpu* gpu){
+bool32 gpuActivate(Renderer* renderer, Gpu* gpu){
 	if(renderer==NULL) return false;
-	if(renderer->gpu.handle!=VK_NULL_HANDLE){
+	if(gpu->device!=VK_NULL_HANDLE){
 		avError("GPU already present");
 		return false;
 	}
-	renderer->gpu = *gpu;
-	gpu = &renderer->gpu;
 
+	GpuRequirements requirements = renderer->gpuRequirements;
 
 	float priority = 1.0f;
 	uint32 queueFamilies[4];
@@ -280,22 +320,37 @@ bool32 gpuConnect(Renderer* renderer, GpuRequirements requirements, Gpu* gpu){
 		.ppEnabledExtensionNames = requirements.requiredExtensions,
 	};
 
-	VkResult result = vkCreateDevice(gpu->physical, &deviceInfo, NULL, &gpu->handle);
+	VkResult result = vkCreateDevice(gpu->physical, &deviceInfo, NULL, &gpu->device);
 	if(result != VK_SUCCESS){
 		avError("Failed to create gpu device");
 		return false;
 	}
-	vkGetDeviceQueue(gpu->handle, gpu->graphicsFamily, 0, &gpu->graphicsQueue);
-	vkGetDeviceQueue(gpu->handle, gpu->presentFamily, 0, &gpu->presentQueue);
-	vkGetDeviceQueue(gpu->handle, gpu->computeFamily, 0, &gpu->computeQueue);
-	vkGetDeviceQueue(gpu->handle, gpu->transferFamily, 0, &gpu->transferQueue);
+	vkGetDeviceQueue(gpu->device, gpu->graphicsFamily, 0, &gpu->graphicsQueue);
+	vkGetDeviceQueue(gpu->device, gpu->presentFamily, 0, &gpu->presentQueue);
+	vkGetDeviceQueue(gpu->device, gpu->computeFamily, 0, &gpu->computeQueue);
+	vkGetDeviceQueue(gpu->device, gpu->transferFamily, 0, &gpu->transferQueue);
 	return true;
 }
-void gpuDisconnect(Renderer* renderer){
-	Gpu* gpu = &renderer->gpu;
-    if (gpu->handle != VK_NULL_HANDLE) {
-        vkDeviceWaitIdle(gpu->handle);
-        vkDestroyDevice(gpu->handle, NULL);
+void gpuDeactivate(Gpu* gpu){
+    if (gpu->device != VK_NULL_HANDLE) {
+        vkDeviceWaitIdle(gpu->device);
+        vkDestroyDevice(gpu->device, NULL);
     }
-    avMemset(gpu, 0, sizeof(Gpu));
+    gpu->device = VK_NULL_HANDLE;
+	gpu->graphicsQueue = VK_NULL_HANDLE;
+	gpu->presentQueue = VK_NULL_HANDLE;
+	gpu->computeQueue = VK_NULL_HANDLE;
+	gpu->transferQueue = VK_NULL_HANDLE;
+}
+
+void cleanupGpus(Renderer* renderer){
+	for(uint32 i = 0; i < renderer->deviceCount; i++){
+		Gpu* gpu = &renderer->devices[i];
+		if(gpu->device!=VK_NULL_HANDLE){
+			gpuDeactivate(gpu);
+		}
+		avMemset(gpu, 0, sizeof(Gpu));
+	}
+	avFree(renderer->devices);
+	renderer->deviceCount = 0;
 }

@@ -22,6 +22,12 @@
 #include <AvUtils/avMemory.h>
 #include "core/utils/math.h"
 
+struct Window {
+	uint32 width;
+	uint32 height;
+	struct wl_surface* surface;
+};
+
 typedef struct WaylandState {
 	struct wl_display* display; 
 	struct wl_registry* registry;
@@ -199,7 +205,7 @@ static const struct xdg_toplevel_listener toplevelListener = {
 };
 
 
-bool8 waylandBackendInitialize(uint64* memoryRequirements, void* statePtr, void* configPtr){
+bool8 waylandBackend_startup(uint64* memoryRequirements, void* statePtr, void* configPtr){
 	*memoryRequirements = sizeof(WaylandState) + _Alignof(WaylandState);
 	if(statePtr==NULL){
 		return true;
@@ -232,7 +238,7 @@ bool8 waylandBackendInitialize(uint64* memoryRequirements, void* statePtr, void*
 	return true;
 }
 
-void waylandBackendShutdown(void* statePtr){
+void waylandBackend_shutdown(void* statePtr){
 	(void)statePtr;
 	if(state->keyboard) wl_keyboard_destroy(state->keyboard);
 	if(state->seat) wl_seat_destroy(state->seat);
@@ -246,14 +252,14 @@ void waylandBackendShutdown(void* statePtr){
 	wl_display_disconnect(state->display);
 }
 
-void waylandBackendGetVulkanRequiredExtensions(const char*** namesDarray){
+void waylandBackend_getVulkanRequiredExtensions(const char*** namesDarray){
 	
 	darrayPush(*namesDarray,(const char*) "VK_KHR_wayland_surface");
 }
-bool32 waylandBackendCreateVulkanSurface(void* instance, void* surface){
+bool32 waylandBackend_createVulkanSurface(void* instance, void* surface, Window window){
 	VkWaylandSurfaceCreateInfoKHR info = {
 		.sType = VK_STRUCTURE_TYPE_WAYLAND_SURFACE_CREATE_INFO_KHR,
-		.surface = state->surface,
+		.surface = window->surface,
 		.display = state->display,
 	};
 	if(vkCreateWaylandSurfaceKHR(instance, &info, NULL, surface) != VK_SUCCESS){
@@ -261,4 +267,14 @@ bool32 waylandBackendCreateVulkanSurface(void* instance, void* surface){
 		return false;
 	}
 	return true;
+}
+
+Window waylandBackend_createWindow(uint32* x, uint32* y, uint32* width, uint32* height, const char* name){
+	// TODO: implement
+	return NULL;
+}
+
+void waylandbackend_destroyWindow(Window window){
+	// TODO: implement
+	(void)window;
 }
