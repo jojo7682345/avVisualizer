@@ -1,4 +1,4 @@
-#!/usr/bin/avBuilder
+#!/usr/bin/env avBuilder
 
 var compiler = "gcc";
 var linker = "gcc";

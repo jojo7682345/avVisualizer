@@ -1,9 +1,11 @@
+#include "core/platform.h"
 #include <entry.h>
 #include <core/systems/ecs.h>
 #include <core/systems/jobs.h>
 #include <core/systems/io.h>
 
 Scene scene = {0};
+Window window = {0};
 
 ComponentType COMPONENT_TYPE_FOO = INVALID_COMPONENT;
 ComponentType COMPONENT_TYPE_BAR = 5;
@@ -150,7 +152,8 @@ bool8 initialize(EngineHandle engine){
     // //jobFenceWait(fence);
     // jobFenceDestroy(fence);
 
-
+    window = platformCreateWindow(0, 0, 1280, 640, "TEST WINDOW");
+    platformCreateWindow(0, 0, 100, 100, "test");
 
     return true;
 }
@@ -161,7 +164,7 @@ void onResize(EngineHandle engine, uint32 width, uint32 height){
 }
 
 void shutdown(EngineHandle engine){
-    
+    platformDestroyWindow(window);
 }
 
 const char* disabledLogCategories[] = {

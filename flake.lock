@@ -1,0 +1,65 @@
+{
+  "nodes": {
+    "avUtils": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1779633076,
+        "narHash": "sha256-gOkHqLFan61vE0Zlpi9uA9UIvTZM7JAzgSADZahZAXA=",
+        "owner": "jojo7682345",
+        "repo": "avUtils",
+        "rev": "d56a13091bcb6a8c38d6e91f11a110663988bf89",
+        "type": "github"
+      },
+      "original": {
+        "owner": "jojo7682345",
+        "repo": "avUtils",
+        "type": "github"
+      }
+    },
+    "avbuilder": {
+      "inputs": {
+        "avUtils": "avUtils",
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1787722977,
+        "narHash": "sha256-tkY3vICtQNOSkqB9j1+5ZuAsD0CbhDRAaTyak9K9Rp8=",
+        "owner": "jojo7682345",
+        "repo": "avBuilder",
+        "rev": "d00c93b582ad2b03024953f2bdb7a997b11936a3",
+        "type": "github"
+      },
+      "original": {
+        "owner": "jojo7682345",
+        "repo": "avBuilder",
+        "type": "github"
+      }
+    },
+    "nixpkgs": {
+      "locked": {
+        "lastModified": 1791456040,
+        "narHash": "sha256-H83yz/do+hjOO0uujHyH8RgtIQP2v7Mw+cLwcZK/xKc=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "e7439b6b14ad3cc35d05608ebca9bce01a25f5f8",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixos-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "root": {
+      "inputs": {
+        "avbuilder": "avbuilder",
+        "nixpkgs": "nixpkgs"
+      }
+    }
+  },
+  "root": "root",
+  "version": 7
+}

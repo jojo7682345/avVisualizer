@@ -74,7 +74,7 @@ EngineSystem engineSystems[] = {
     {.initialize=platformSystemStartup,     .uninitialize=platformSystemShutdown,   .config=&platformConfig     },
     {.initialize=jobSystemInitialize,       .uninitialize=jobSystemDeinitialize,    .config=&jobsystemConfig    },
     {.initialize=initializeIoSystem,        .uninitialize=deinitializeIoSystem,     .config=&ioSystemConfig     },
-    {.initialize=rendererStartup,           .uninitialize=rendererShutdown,         .config=&rendererConfig     },
+    //{.initialize=rendererStartup,           .uninitialize=rendererShutdown,         .config=&rendererConfig     },
 };
 
 bool8 systemsInitialize(EngineConfig* config){
@@ -142,7 +142,9 @@ bool8 systemsInitialize(EngineConfig* config){
 
 void systemsUninitialize(){
     for(uint32 i = 0; i < sizeof(engineSystems)/sizeof(EngineSystem); i++){
-        engineSystems[i].uninitialize(engineSystems[i].state);
+        uint32 index = sizeof(engineSystems)/sizeof(engineSystems[0]) - i - 1;
+
+        engineSystems[index].uninitialize(engineSystems[index].state);
     }
     avFree(engineState->systemsMemory);
 }

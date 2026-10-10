@@ -1,4 +1,4 @@
-#!/usr/bin/avBuilder
+#!/usr/bin/env avBuilder
 var compiler = "gcc";
 var linker = "gcc";
 
@@ -172,6 +172,7 @@ func buildLib(){
         libs += [ "user32", "gdi32", "D2d1", "windowscodecs", "opengl32", "Dwmapi", "vulkan-1" ];
         libName = PROJECT_NAME + ".dll";
         libLnkName = PROJECT_NAME + ".lib";
+        libflags += [compileString("-Wl,--out-implib=bin/$libLnkName")];
     }else if(PLATFORM=="LINUX"){
         libs += [ "vulkan" ];
         libName = "lib" + PROJECT_NAME + ".so";
@@ -183,7 +184,7 @@ func buildLib(){
     //objects += recompile(getCppFiles(srcDir), "build", libflags + ["-xc++", "-lstdc++", "-shared-libgcc" ], includes, additionalDependencies); //+ 
     if(requiresRelink("bin/"+libName, objects, additionalDependencies)){
         makeDir("bin");
-        linkExecutable(objects, "bin", libName, libflags + [ "--shared",compileString("-Wl,--out-implib=bin/$libLnkName"), "-shared-libgcc" ], libDirs, libs + ["stdc++"]);
+        linkExecutable(objects, "bin", libName, libflags + [ "--shared", "-shared-libgcc" ], libDirs, libs + ["stdc++"]);
     }
     println("complation of engine complete");
 }

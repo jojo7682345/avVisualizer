@@ -81,8 +81,8 @@ AV_API uint64 platformGetAllocationGranularity();
 
 
 typedef struct Window* Window;
-
-AV_API Window platformCreateWindow(uint32* x, uint32* y, uint32* width, uint32* height, const char* title);
+/*x,y,width and height are only hints*/
+AV_API Window platformCreateWindow(uint32 x, uint32 y, uint32 width, uint32 height, const char* title);
 AV_API void platformDestroyWindow(Window window);
 
 typedef struct MemoryRegion {

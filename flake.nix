@@ -25,8 +25,13 @@
 				avbuilder
 				vulkan-headers
 				vulkan-tools
+				vulkan-validation-layers
+				vulkan-loader
 				shaderc
+				shaderc.lib
 				spirv-tools
+				wayland-protocols
+				wayland
 			];
 			buildInputs = with pkgs; [
 			];

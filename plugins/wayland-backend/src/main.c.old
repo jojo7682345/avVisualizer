@@ -274,7 +274,15 @@ Window waylandBackend_createWindow(uint32* x, uint32* y, uint32* width, uint32* 
 	return NULL;
 }
 
-void waylandbackend_destroyWindow(Window window){
+void waylandBackend_destroyWindow(Window window){
 	// TODO: implement
 	(void)window;
+}
+
+void waylandBackend_getFramebufferSize(uint32* w, uint32* h){
+	// TODO: implement
+}
+
+void waylandBackend_pumpMessages(){
+	// TODO: implement
 }

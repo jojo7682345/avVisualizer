@@ -4,3 +4,5 @@ build/
 shaders/include/
 *.ini
 tools/spirv-reflect
+.direnv
+.cache

@@ -281,7 +281,7 @@ int processShader(const char* file, ShaderBinary* binary, ShaderType type, shade
 	
 		if (status != shaderc_compilation_status_success) {
 			const char* errorMsg = shaderc_result_get_error_message(result);
-			fprintf(stderr, "compilation error:\n%s\n\ncompilation resulted in %i warnings and %i errors\n",errorMsg, numWarnings, numErrors);
+			fprintf(stderr, "compilation error:\n%s\n\ncompilation resulted in %i warnings and %i errors\n",errorMsg, (int)numWarnings, (int)numErrors);
 			shaderc_result_release(result);
 			return 0;
 		}
