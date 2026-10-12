@@ -25,3 +25,5 @@ void cleanupGpus(Renderer* renderer);
 
 bool32 gpuSelect(Renderer* renderer, GpuRequirements requirements, GpuPreferences preferences, Gpu* gpu);
 bool32 gpuActivate(Renderer* renderer, Gpu* gpu);
+
+bool32 gpuIsActive(Gpu* gpu);

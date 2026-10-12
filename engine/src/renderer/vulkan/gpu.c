@@ -292,7 +292,7 @@ bool32 gpuSelect(Renderer* renderer, GpuRequirements requirements, GpuPreference
 bool32 gpuActivate(Renderer* renderer, Gpu* gpu){
 	if(renderer==NULL) return false;
 	if(gpu->device!=VK_NULL_HANDLE){
-		avError("GPU already present");
+		avError("GPU already activated");
 		return false;
 	}
 
@@ -353,4 +353,8 @@ void cleanupGpus(Renderer* renderer){
 	}
 	avFree(renderer->devices);
 	renderer->deviceCount = 0;
+}
+
+bool32 gpuIsActive(Gpu* gpu){
+	return gpu->device!=VK_NULL_HANDLE;
 }

@@ -39,6 +39,9 @@ typedef enum WindowPresentMode {
 typedef struct WindowRenderTargetConfig {
     WindowSurfaceFormat format;
     WindowPresentMode presentMode;
+    uint32 requestedWidth;
+    uint32 requestedHeight;
+    bool8 transferDestination;
 } WindowRenderTargetConfig;
 
 RenderTargetHandle renderTargetCreateFromWindow(Window window, WindowRenderTargetConfig config);

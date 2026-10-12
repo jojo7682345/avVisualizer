@@ -54,23 +54,29 @@ typedef struct PresentTarget {
 	VkSurfaceKHR surface;
 	VkSwapchainKHR swapchain;
 
-	VkPresentModeKHR presentMode;
-    VkCompositeAlphaFlagBitsKHR compositeAlpha;
-    VkSurfaceTransformFlagBitsKHR transform;
-
 	Gpu* gpu;
 } PresentTarget;
+
+typedef enum RenderTargetType {
+	RENDER_TARGET_TYPE_IMAGE, // aquire image using frameIndex
+	RENDER_TARGET_TYPE_SWAPCHAIN, // aquireImage using presentTarget swapchain
+	RENDER_TARGET_TYPE_CROSS_GPU_SWAPCHAIN, // aquire image using presentTarget swapchain
+} RenderTargetType;
+
 typedef struct RenderTarget {
 	VkExtent2D extent;
 	VkFormat format;
 	uint32 imageCount;
 	VkImage* images;
 	VkImageView* imageViews;
+	VkDeviceMemory imageMemory;
 	VkImageUsageFlags usage;
 	VkImageAspectFlags aspect;
 	VkSampleCountFlagBits samples;
 
-	PresentTarget* presentTarget; // presence of presentTarget denotes wether or not it is a render output
+	RenderTargetType type;
+	PresentTarget presentTarget; // is owned by the renderTarget on the main gpu
+	RenderTargetHandle presentationTarget; // is renderTarget image needs to be transfered to for cross gpu presenting, if -1 renderTarget is owned by other gpu
 } RenderTarget;
 
 
