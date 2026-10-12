@@ -29,9 +29,6 @@ bool8 platformSystemStartup(uint64* memoryRequirement, void* state, void* config
  */
 void platformSystemShutdown(void* platformState);
 
-
-void platformGetFramebufferSize(uint32* width, uint32* height);
-
 /**
  * @brief Performs any platform-specific message pumping that is required
  * for windowing, etc.
@@ -40,30 +37,13 @@ void platformGetFramebufferSize(uint32* width, uint32* height);
  */
 bool8 platformPumpMessages(void);
 
-// /**
-//  * @brief Performs platform-specific printing to the console of the given
-//  * message and colour code (if supported).
-//  *
-//  * @param message The message to be printed.
-//  * @param colour The colour to print the text in (if supported).
-//  */
-// void platformConsoleWrite(const char* message, uint8 colour);
-
-// /**
-//  * @brief Performs platform-specific printing to the error console of the given
-//  * message and colour code (if supported).
-//  *
-//  * @param message The message to be printed.
-//  * @param colour The colour to print the text in (if supported).
-//  */
-// void platformConsoleWriteError(const char* message, uint8 colour);
 
 /**
  * @brief Gets the absolute time since the application started.
  *
  * @return The absolute time since the application started.
  */
-double platformGetAbsoluteTime(void);
+AV_API double platformGetAbsoluteTime(void);
 
 /**
  * @brief Sleep on the thread for the provided milliseconds. This blocks the main thread.
@@ -82,8 +62,18 @@ AV_API uint64 platformGetAllocationGranularity();
 
 typedef struct Window* Window;
 /*x,y,width and height are only hints*/
-AV_API Window platformCreateWindow(uint32 x, uint32 y, uint32 width, uint32 height, const char* title);
-AV_API void platformDestroyWindow(Window window);
+Window platformCreateWindow(uint32 x, uint32 y, uint32 width, uint32 height, const char* title, void* ctx);
+void platformDestroyWindow(Window window);
+
+
+
+typedef struct Plugin Plugin;
+AV_API Plugin* platformLoadPlugin(const char* pluginName, const void* data, uint64 size);
+AV_API void* platformLoadPluginSymbol(Plugin* plugin, const char* symbol);
+AV_API void platformUnloadPlugin(Plugin* plugin);
+
+void platformGetVulkanRequiredExtensionNames(const char*** namesDarray);
+bool32 platformCreateVulkanSurface(void* vkInstance, void* surface, Window window);
 
 typedef struct MemoryRegion {
     uint64 size;
@@ -94,11 +84,3 @@ AV_API MemoryRegion platformReserveMemory(uint64 size);
 AV_API bool32 platformCommitMemory(void* ptr, uint64 size);
 AV_API bool32 platformDecommitMemory(void* ptr, uint64 size);
 AV_API void platformReleaseMemory(MemoryRegion region);
-
-typedef struct Plugin Plugin;
-AV_API Plugin* platformLoadPlugin(const char* pluginName, const void* data, uint64 size);
-AV_API void* platformLoadPluginSymbol(Plugin* plugin, const char* symbol);
-AV_API void platformUnloadPlugin(Plugin* plugin);
-
-void platformGetVulkanRequiredExtensionNames(const char*** namesDarray);
-bool32 platformCreateVulkanSurface(void* vkInstance, void* surface, Window window);

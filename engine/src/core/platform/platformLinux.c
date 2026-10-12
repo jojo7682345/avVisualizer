@@ -27,7 +27,7 @@
     BACKEND_FUNC(bool8, pumpMessages, void)\
 	BACKEND_FUNC(void, getVulkanRequiredExtensions, const char*** namesDarray)\
 	BACKEND_FUNC(bool32, createVulkanSurface, void* instance, void* surface, Window window)\
-	BACKEND_FUNC(Window, createWindow, uint32 x, uint32 y, uint32 width, uint32 height, const char* title)\
+	BACKEND_FUNC(Window, createWindow, uint32 x, uint32 y, uint32 width, uint32 height, const char* title, void* ctx)\
 	BACKEND_FUNC(void, destroyWindow, Window window)\
 
 #define BACKEND_FUNC(type, name, ...) type (*name) (__VA_ARGS__);
@@ -90,8 +90,8 @@ bool32 platformCreateVulkanSurface(void* vkInstance, void* surface, Window windo
 }
 
 
-AV_API Window platformCreateWindow(uint32 x, uint32 y, uint32 width, uint32 height, const char* title){
-	return backend.createWindow(x, y, width, height, title);
+AV_API Window platformCreateWindow(uint32 x, uint32 y, uint32 width, uint32 height, const char* title, void* ctx){
+	return backend.createWindow(x, y, width, height, title, ctx);
 }
 AV_API void platformDestroyWindow(Window window){
 	return backend.destroyWindow(window);
@@ -129,34 +129,6 @@ AV_API uint64 platformGetAllocationGranularity(){
 	return platformGetPageSize();
 }
 
-AV_API MemoryRegion platformReserveMemory(uint64 size){
-	MemoryRegion region = {0};
-	void* ptr = mmap(0, size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-	if(ptr != MAP_FAILED){
-		region.ptr = ptr;
-		region.size = size;
-	}
-	return region;
-}
-AV_API bool32 platformCommitMemory(void* ptr, uint64 size){
-	int result = mprotect(ptr, size, PROT_READ | PROT_WRITE);
-	if(result != 0){
-		return false;
-	}
-	return true;
-}
-AV_API bool32 platformDecommitMemory(void* ptr, uint64 size){
-	if(mprotect(ptr, size, PROT_NONE) != 0){
-		return false;
-	}
-	madvise(ptr, size, MADV_DONTNEED);
-	return true;
-}
-AV_API void platformReleaseMemory(MemoryRegion region){
-	if(region.ptr && region.size){
-		munmap(region.ptr, region.size);
-	}
-}
 
 struct Plugin {
 	void* lib;
@@ -197,4 +169,34 @@ AV_API void platformUnloadPlugin(Plugin* plugin){
 	dlclose(plugin);
 }
 
+
+
+AV_API MemoryRegion platformReserveMemory(uint64 size){
+	MemoryRegion region = {0};
+	void* ptr = mmap(0, size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	if(ptr != MAP_FAILED){
+		region.ptr = ptr;
+		region.size = size;
+	}
+	return region;
+}
+AV_API bool32 platformCommitMemory(void* ptr, uint64 size){
+	int result = mprotect(ptr, size, PROT_READ | PROT_WRITE);
+	if(result != 0){
+		return false;
+	}
+	return true;
+}
+AV_API bool32 platformDecommitMemory(void* ptr, uint64 size){
+	if(mprotect(ptr, size, PROT_NONE) != 0){
+		return false;
+	}
+	madvise(ptr, size, MADV_DONTNEED);
+	return true;
+}
+AV_API void platformReleaseMemory(MemoryRegion region){
+	if(region.ptr && region.size){
+		munmap(region.ptr, region.size);
+	}
+}
 #endif

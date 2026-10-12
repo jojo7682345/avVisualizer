@@ -118,24 +118,6 @@ typedef enum SystemEventCode {
      */
     EVENT_CODE_DEFAULT_RENDERTARGET_REFRESH_REQUIRED = 0x16,
 
-    /**
-     * @brief An event fired by the kvar system when a kvar has been updated.
-     */
-    EVENT_CODE_KVAR_CHANGED = 0x17,
-
-    /**
-     * @brief An event fired when a watched file has been written to.
-     * Context usage:
-     * uint32 watch_id = context.data.uint32[0];
-     */
-    EVENT_CODE_WATCHED_FILE_WRITTEN = 0x18,
-
-    /**
-     * @brief An event fired when a watched file has been removed.
-     * Context usage:
-     * uint32 watch_id = context.data.uint32[0];
-     */
-    EVENT_CODE_WATCHED_FILE_DELETED = 0x19,
 
     /**
      * @brief An event fired while a button is being held down and the
@@ -146,7 +128,7 @@ typedef enum SystemEventCode {
      * int16 y = context.data.int16[1]
      * uint16 button = context.data.uint16[2]
      */
-    EVENT_CODE_MOUSE_DRAGGED = 0x20,
+    EVENT_CODE_MOUSE_DRAGGED = 0x17,
 
     /**
      * @brief An event fired when a button is pressed and a mouse movement
@@ -157,7 +139,7 @@ typedef enum SystemEventCode {
      * int16 y = context.data.int16[1]
      * uint16 button = context.data.uint16[2]
      */
-    EVENT_CODE_MOUSE_DRAG_BEGIN = 0x21,
+    EVENT_CODE_MOUSE_DRAG_BEGIN = 0x18,
 
     /**
      * @brief An event fired when a button is released was previously dragging.
@@ -167,7 +149,31 @@ typedef enum SystemEventCode {
      * int16 y = context.data.int16[1]
      * uint16 button = context.data.uint16[2]
      */
-    EVENT_CODE_MOUSE_DRAG_END = 0x22,
+    EVENT_CODE_MOUSE_DRAG_END = 0x19,
+
+
+    /**
+     * @brief An event firew when a window is closed
+     * 
+     * Context usage:
+     * uint32 windowID 
+     * IMPORTANT!!!! windoowID is no longer valid, it is only provided if the windowID is used for application specific uses.
+     * do not use it anywhere in the engine anymore
+     */
+    EVENT_CODE_WINDOW_CLOSED = 0x1A,
+
+    /**
+     * @brief An event firew when a window is closed
+     */
+    EVENT_CODE_ALL_WINDOWS_CLOSED = 0x1B,
+
+    /**
+     * @brief An event firew when a window is closed
+     * 
+     * Context usage:
+     * uint32 windowID
+     */
+    EVENT_CODE_WINDOW_REQUEST_CLOSE = 0x1C,
 
     /** @brief The maximum event code that can be used internally. */
     MAX_EVENT_CODE = 0xFF

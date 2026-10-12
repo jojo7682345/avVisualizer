@@ -1,11 +1,13 @@
-#include "core/platform.h"
+
+#include "engine.h"
 #include <entry.h>
 #include <core/systems/ecs.h>
 #include <core/systems/jobs.h>
 #include <core/systems/io.h>
+#include <core/systems/event.h>
+#include <core/systems/window.h>
 
 Scene scene = {0};
-Window window = {0};
 
 ComponentType COMPONENT_TYPE_FOO = INVALID_COMPONENT;
 ComponentType COMPONENT_TYPE_BAR = 5;
@@ -41,12 +43,12 @@ void barDestructor(Scene scene, Entity entity, void* component, uint32 size){
 
 volatile uint32 completedWork[12] = {0, 0};
 
-#include <AvUtils/avThreading.h>
 JobControl exampleJob(byte* input, uint32 inputSize, byte* output, uint32 outputSize, JobContext* context){
     //avDebug("Hello from worker thread %u", context->threadId);
     for(uint32 i = 0; i < 10000000; i++){
     }
     //avThreadSleep(10);
+    //platformSleep(10);
     completedWork[context->threadId]++;
     //avDebug("Thread %u completed %u jobs", context->threadId, completedWork[context->threadId]);
     JOB_EXIT();
@@ -152,8 +154,9 @@ bool8 initialize(EngineHandle engine){
     // //jobFenceWait(fence);
     // jobFenceDestroy(fence);
 
-    window = platformCreateWindow(0, 0, 1280, 640, "TEST WINDOW");
-    platformCreateWindow(0, 0, 100, 100, "test");
+    windowCreate(0, 0, 1280, 640, "Test");
+    windowCreate(0, 0, 1280, 640, "Test2");
+    
 
     return true;
 }
@@ -164,7 +167,7 @@ void onResize(EngineHandle engine, uint32 width, uint32 height){
 }
 
 void shutdown(EngineHandle engine){
-    platformDestroyWindow(window);
+
 }
 
 const char* disabledLogCategories[] = {

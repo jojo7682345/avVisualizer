@@ -3,6 +3,7 @@
 #include "core/platform.h"
 
 #include <AvUtils/avMemory.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #define _GNU_SOURCE
@@ -79,8 +80,11 @@ static void handleTopLevelClose(void* data, struct xdg_toplevel* toplevel){
     Window window = data;
     window->shouldClose = true;
 
-    EventContext eventData = {};
-    eventFire(EVENT(EVENT_CODE_APPLICATION_QUIT, 0, eventData));
+    EventContext eventData = {
+        .data.u32[0] = (uint32)((uint64)window->ctx),
+    };
+    //avDebug("Event fired");
+    eventFire(EVENT(EVENT_CODE_WINDOW_REQUEST_CLOSE, 0, eventData));
 }
 
 static const struct xdg_toplevel_listener toplevelListener = {
@@ -99,11 +103,12 @@ static const struct xdg_surface_listener surfaceListener = {
 };
 
 
-Window waylandWindowCreate(WaylandDisplay* display, uint32 width, uint32 height, const char* title){
+Window waylandWindowCreate(WaylandDisplay* display, uint32 width, uint32 height, const char* title, void* ctx){
     if(display==NULL || !display->initialized) return NULL;
     Window window = avAllocate(sizeof(*window), "allocating window");
     if(window == NULL) return NULL;
     avMemset(window, 0, sizeof(struct Window));
+    window->ctx = ctx;
     window->display = display;
     window->requestedPixelWidth = width;
     window->requestedPixelHeight = height;

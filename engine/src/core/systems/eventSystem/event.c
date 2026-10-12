@@ -6,6 +6,9 @@
 #include "core/utils/allocator.h"
 #include "core/utils/math.h"
 
+#define AV_LOG_CATEGORY "event system"
+#include "logging.h"
+
 #define EVENT_BATCH_SIZE 128
 #define EVENT_POOL_SIZE 512
 //#define EVENT_PIPELINE_SIZE 32
@@ -356,6 +359,7 @@ static bool32 addEvent(Event event, bool32 (writeEventFn)(Event,EventPipeline*))
     if(event.id >= state->maxID){
         return false;
     }
+    //avDebug("Event fired for code %u", event.id);
     // reading here
     avRWLockReadLock(state->eventLock);
     EventPipeline* pipeline = getPipeline(event.id);

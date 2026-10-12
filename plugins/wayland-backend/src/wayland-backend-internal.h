@@ -34,11 +34,12 @@ typedef struct Window {
     bool32 configured;
     bool32 shouldClose;
     bool32 resizePending;
+    void* ctx;
 } WaylandWindow;
 
 bool32 waylandDisplayInitialize(WaylandDisplay* display);
 void waylandDisplayShutdown(WaylandDisplay* display);
 bool8 waylandDisplayPumpMessages(WaylandDisplay* display);
 
-Window waylandWindowCreate(WaylandDisplay* display, uint32 width, uint32 height, const char* title);
+Window waylandWindowCreate(WaylandDisplay* display, uint32 width, uint32 height, const char* title, void* ctx);
 void waylandWindowDestroy(Window window);

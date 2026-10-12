@@ -7,6 +7,9 @@
 #include <wayland-client-protocol.h>
 #include <wayland-client.h>
 #include "wayland-backend-internal.h"
+#include <vulkan/vulkan.h>
+#include <vulkan/vulkan_wayland.h>
+#include "containers/darray.h"
 
 typedef struct WaylandBackendState {
     WaylandDisplay display;
@@ -38,18 +41,26 @@ void waylandBackend_shutdown(void* statePtr){
 }
 
 void waylandBackend_getVulkanRequiredExtensions(const char*** namesDarray){
-	// TODO: implement
+	darrayPush(*namesDarray,(const char*) "VK_KHR_wayland_surface");
 }
 bool32 waylandBackend_createVulkanSurface(void* instance, void* surface, Window window){
-	// TODO: implement
-    return false;
+	VkWaylandSurfaceCreateInfoKHR info = {
+		.sType = VK_STRUCTURE_TYPE_WAYLAND_SURFACE_CREATE_INFO_KHR,
+		.surface = window->surface,
+		.display = state->display.display,
+	};
+	if(vkCreateWaylandSurfaceKHR(instance, &info, NULL, surface) != VK_SUCCESS){
+		avError("Failed to create wayland surface");
+		return false;
+	}
+	return true;
 }
 
-Window waylandBackend_createWindow(uint32 x, uint32 y, uint32 width, uint32 height, const char* name){
+Window waylandBackend_createWindow(uint32 x, uint32 y, uint32 width, uint32 height, const char* name, void* ctx){
 	(void)x;
     (void)y;
     if(state==NULL)return NULL;
-    return waylandWindowCreate(&state->display, width, height, name);
+    return waylandWindowCreate(&state->display, width, height, name, ctx);
 	return NULL;
 }
 

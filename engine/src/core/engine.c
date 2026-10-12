@@ -14,6 +14,7 @@
 #include "core/utils/clock.h"
 #include "renderer/renderer.h"
 #include "core/systems/ecs.h"
+#include "core/systems/window.h"
 
 typedef struct EngineState {
     EngineConfig config;
@@ -68,12 +69,14 @@ static EventSystemConfig eventConfig;
 static RendererConfig rendererConfig;
 static JobSystemConfig jobsystemConfig;
 static IoSystemConfig ioSystemConfig;
+static WindowSystemConfig windowSystemConfig;
 EngineSystem engineSystems[] = {
     {.initialize=eventSystemInitialize,     .uninitialize=eventSystemShutdown,      .config=&eventConfig        },
     {.initialize=inputSystemInitialize,     .uninitialize=inputSystemShutdown,      .config=NULL                }, 
     {.initialize=platformSystemStartup,     .uninitialize=platformSystemShutdown,   .config=&platformConfig     },
     {.initialize=jobSystemInitialize,       .uninitialize=jobSystemDeinitialize,    .config=&jobsystemConfig    },
     {.initialize=initializeIoSystem,        .uninitialize=deinitializeIoSystem,     .config=&ioSystemConfig     },
+    {.initialize=initializeWindowSystem,    .uninitialize=shutdownWindowSystem,     .config=&windowSystemConfig },
     //{.initialize=rendererStartup,           .uninitialize=rendererShutdown,         .config=&rendererConfig     },
 };
 
@@ -103,6 +106,9 @@ bool8 systemsInitialize(EngineConfig* config){
     ioSystemConfig.inlineBufferSize = 256 * 1024; // 256 KB
     ioSystemConfig.threadCount = 1;
     
+    windowSystemConfig.maxWindows = 2;  // add to engine config
+    windowSystemConfig.windowRequestCloseHandlerOverride = NULL; // add to engine config
+    windowSystemConfig.allwindowsClosedHandlerOverride = NULL;  // add to engine config
     
     uint64 totalMemSize = 0;
     for(uint32 i = 0; i < sizeof(engineSystems)/sizeof(EngineSystem); i++){
@@ -119,6 +125,7 @@ bool8 systemsInitialize(EngineConfig* config){
     }
     engineState->systemsMemory = avAllocate(totalMemSize, "Allocating systems memory");
     avMemset(engineState->systemsMemory, 0, totalMemSize);
+    avDebug("Systems requested %lu KiB of static memory", totalMemSize / 1024);
     byte* memory = engineState->systemsMemory;
     for(uint32 i = 0; i < sizeof(engineSystems)/sizeof(EngineSystem); i++){
         uint64 memSize = 0;

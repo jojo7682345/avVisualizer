@@ -11,7 +11,7 @@
 
 #include "containers/queues/mpmcQueue.h"
 #include "core/utils/math.h"
-#define AV_LOG_CATEGORY "IO"
+#define AV_LOG_CATEGORY "io system"
 #include "logging.h"
 
 
