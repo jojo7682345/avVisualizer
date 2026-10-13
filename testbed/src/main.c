@@ -154,8 +154,8 @@ bool8 initialize(EngineHandle engine){
     // //jobFenceWait(fence);
     // jobFenceDestroy(fence);
 
-    windowCreate(0, 0, 1280, 640, "Test");
-    windowCreate(0, 0, 1280, 640, "Test2");
+    //windowCreate(0, 0, 1280, 640, "Test");
+    //windowCreate(0, 0, 1280, 640, "Test2");
     
 
     return true;
@@ -204,14 +204,14 @@ bool8 configureEngine(EngineConfig* out_application) {
     //out_application->logSettings = &logSettings;
 
     // Application configuration.
-    out_application->appConfig.startPosX = 100;
-    out_application->appConfig.startPosY = 100;
-    out_application->appConfig.startWidth = 1280;
-    out_application->appConfig.startHeight = 720;
+    // out_application->appConfig.startPosX = 100;
+    // out_application->appConfig.startPosY = 100;
+    // out_application->appConfig.startWidth = 1280;
+    // out_application->appConfig.startHeight = 720;
     out_application->appConfig.name = "AvVisualizer TestBed!";
 
     out_application->initialize = initialize;
-    out_application->onResize = onResize;
+    // out_application->onResize = onResize;
     out_application->shutdown = shutdown;
     return true;
 }

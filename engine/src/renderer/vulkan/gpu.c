@@ -165,12 +165,36 @@ static int32 scoreGpu(VkPhysicalDevice device, VkSurfaceKHR surface, const GpuRe
 	}
 
 	int32 score = 1; // the gpu is acceptable
+	switch (candidate.properties.deviceType) {
+        case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU:
+            score += 10000;
+            break;
+
+        case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU:
+            score += 5000;
+            break;
+
+        case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU:
+            score += 2500;
+            break;
+
+        case VK_PHYSICAL_DEVICE_TYPE_OTHER:
+            score += 1000;
+            break;
+
+		case VK_PHYSICAL_DEVICE_TYPE_CPU:
+		default:
+            score -= 10000;
+            break;
+    }
+
+
 	if(preferences->type != GPU_TYPE_ANY){
 		if(preferences->type == GPU_TYPE_DISCRETE && candidate.properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU){
-			score += 1000;
+			score += 20000;
 		}
 		if(preferences->type == GPU_TYPE_INTEGRATED && candidate.properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU){
-			score += 1000;
+			score += 20000;
 		}
 	}
 	VkDeviceSize localMemory = 0;
@@ -179,7 +203,9 @@ static int32 scoreGpu(VkPhysicalDevice device, VkSurfaceKHR surface, const GpuRe
 			localMemory += candidate.memory.memoryHeaps[i].size;
 		}
 	}
-	score += (int32)(localMemory / (1024*1024));
+	// Cap the contribution to prevent memory size dominating the score.
+	uint64 memoryMiB = localMemory / (1024 * 1024);
+    score += (int32)(memoryMiB > 4096 ? 4096 : memoryMiB);
 
 	*gpuInfo = candidate;
 	return score;

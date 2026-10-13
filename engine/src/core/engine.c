@@ -12,7 +12,7 @@
 #include "core/systems/io.h"
 #include "core/systems/jobs.h"
 #include "core/utils/clock.h"
-#include "renderer/renderer.h"
+#include "renderer/rendererCore.h"
 #include "core/systems/ecs.h"
 #include "core/systems/window.h"
 
@@ -20,8 +20,6 @@ typedef struct EngineState {
     EngineConfig config;
     bool8 is_running;
     bool8 is_suspended;
-    int16 width;
-    int16 height;
     Clock clock;
     double last_time;
     uint64 frameIndex;
@@ -76,8 +74,8 @@ EngineSystem engineSystems[] = {
     {.initialize=platformSystemStartup,     .uninitialize=platformSystemShutdown,   .config=&platformConfig     },
     {.initialize=jobSystemInitialize,       .uninitialize=jobSystemDeinitialize,    .config=&jobsystemConfig    },
     {.initialize=initializeIoSystem,        .uninitialize=deinitializeIoSystem,     .config=&ioSystemConfig     },
+    {.initialize=rendererStartup,           .uninitialize=rendererShutdown,         .config=&rendererConfig     },
     {.initialize=initializeWindowSystem,    .uninitialize=shutdownWindowSystem,     .config=&windowSystemConfig },
-    //{.initialize=rendererStartup,           .uninitialize=rendererShutdown,         .config=&rendererConfig     },
 };
 
 bool8 systemsInitialize(EngineConfig* config){
@@ -85,13 +83,6 @@ bool8 systemsInitialize(EngineConfig* config){
     eventConfig.maxIDs = 0xffff;
 
     platformConfig.applicationName = config->appConfig.name;
-    platformConfig.x = config->appConfig.startPosX;
-    platformConfig.y = config->appConfig.startPosY;
-    platformConfig.width = config->appConfig.startWidth;
-    platformConfig.height = config->appConfig.startHeight;
-    
-    engineState->width = config->appConfig.startWidth;
-    engineState->height = config->appConfig.startHeight;
 
     rendererConfig.appName = config->appConfig.name;
     rendererConfig.engineName = "AV_VISUALIZER";
@@ -245,25 +236,30 @@ static void engineOnEvent(Event* events, uint32 count) {
 }
 
 static void engineOnResized(Event* events, uint32 count){//(uint16 code, void* sender, void* listener_inst, EventContext context) {
-    bool32 resized = false;
-    uint16 width = 0;
-    uint16 height = 0;
-    for(uint32 i = 0; i < count; i++){
-        Event* event = events+i;
-        if (event->id == EVENT_CODE_RESIZED) {
-            resized = true;
-            event->flags.consumed = 1;
-            width = event->context.data.u16[0];
-            height = event->context.data.u16[1];
-            continue;
-        }
-    }
-    if(resized){
-        engineState->width = width;
-        engineState->height = height;
-        engineState->config.onResize(engineState, engineState->width, engineState->height);
-        //rendererSignalResize();
-    }
+    //TODO: update window sizes
+    
+    (void)events;
+    (void)count;
+    
+    // bool32 resized = false;
+    // uint16 width = 0;
+    // uint16 height = 0;
+    // for(uint32 i = 0; i < count; i++){
+    //     Event* event = events+i;
+    //     if (event->id == EVENT_CODE_RESIZED) {
+    //         resized = true;
+    //         event->flags.consumed = 1;
+    //         width = event->context.data.u16[0];
+    //         height = event->context.data.u16[1];
+    //         continue;
+    //     }
+    // }
+    // if(resized){
+    //     engineState->width = width;
+    //     engineState->height = height;
+    //     engineState->config.onResize(engineState, engineState->width, engineState->height);
+    //     //rendererSignalResize();
+    // }
 }
 
 void engine_on_event_system_initialized(void) {

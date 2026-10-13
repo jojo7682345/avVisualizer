@@ -104,7 +104,20 @@ WindowID windowCreate(uint32 x, uint32 y, uint32 width, uint32 height, const cha
         avError("Created too many windows");
         return MAPPING_INVALID_ID;
     }
-    Window window = platformCreateWindow(x, y, width, height, title, (void*)windowID);
+    WindowConfig config = {
+        .ctx = (void*)windowID,
+        .width = width,
+        .height = height,
+        .x = x,
+        .y = y,
+        .title = title,
+        .flags = {
+            .hidden = false,
+            .dummyContent = true, // TODO: change
+        },
+    };
+
+    Window window = platformCreateWindow(config);
     if(window == NULL){
         avError("Unable to open window");
         MAPPING_REMOVE(window, windowID);

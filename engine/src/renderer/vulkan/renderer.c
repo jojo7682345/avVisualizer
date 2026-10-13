@@ -1,5 +1,5 @@
 #include "renderer.h"
-#include "../renderer.h"
+#include "../rendererCore.h"
 
 #include "containers/darray.h"
 #include "core/platform.h"
@@ -40,11 +40,20 @@ bool8 rendererStartup(uint64* memoryRequirement, void* statePtr, void* configPtr
 	}
 	darrayDestroy(extensions);
 
-
-	VkSurfaceKHR mainSurface;
-	if(!platformCreateVulkanSurface(renderer->instance.handle, &mainSurface, config->mainWindow)){
+	Window bootstrapWindow = platformCreateWindow((WindowConfig){
+		.ctx = NULL,
+		.width = 100,
+		.height = 100,
+		.title = config->engineName,
+		.flags = {
+			.hidden = true,
+			.disableEvents = true,
+		},
+	});
+	VkSurfaceKHR mainSurface = VK_NULL_HANDLE;
+	if(!platformCreateVulkanSurface(renderer->instance.handle, &mainSurface, bootstrapWindow)){
 		avError("Failed to create surface");
-		return false;
+		goto cleanup;
 	}
 
 	GpuRequirements gpuReq = {
@@ -55,6 +64,7 @@ bool8 rendererStartup(uint64* memoryRequirement, void* statePtr, void* configPtr
 		.requiredExtensions = (const char*[]){
 			VK_KHR_SWAPCHAIN_EXTENSION_NAME,
 		},
+		.surface = mainSurface,
 	};
 	GpuPreferences gpuPref = {
 		.type = GPU_TYPE_ANY,
@@ -62,16 +72,26 @@ bool8 rendererStartup(uint64* memoryRequirement, void* statePtr, void* configPtr
 	};
 	if(!querryGpus(renderer, gpuReq, gpuPref)){
 		avError("Failed to find suitable GPU's");
-		return false;
+		goto cleanup;
 	}
 	//activate main gpu
 	if(!gpuActivate(renderer, renderer->gpu)){
 		avError("Failed to connect to gpu");
-		return false;
+		goto cleanup;
 	}
 
+	vkDestroySurfaceKHR(renderer->instance.handle, mainSurface, NULL);
+	platformDestroyWindow(bootstrapWindow);
+	mainSurface = VK_NULL_HANDLE;
+	bootstrapWindow = NULL;
 
 	return true;
+cleanup:
+	if(mainSurface != VK_NULL_HANDLE) vkDestroySurfaceKHR(renderer->instance.handle, mainSurface, NULL);
+	if(bootstrapWindow!=NULL)platformDestroyWindow(bootstrapWindow);
+
+	//TODO: add cleanup of other things
+	return false;
 }
 
 

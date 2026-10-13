@@ -27,7 +27,7 @@
     BACKEND_FUNC(bool8, pumpMessages, void)\
 	BACKEND_FUNC(void, getVulkanRequiredExtensions, const char*** namesDarray)\
 	BACKEND_FUNC(bool32, createVulkanSurface, void* instance, void* surface, Window window)\
-	BACKEND_FUNC(Window, createWindow, uint32 x, uint32 y, uint32 width, uint32 height, const char* title, void* ctx)\
+	BACKEND_FUNC(Window, createWindow, WindowConfig config)\
 	BACKEND_FUNC(void, destroyWindow, Window window)\
 
 #define BACKEND_FUNC(type, name, ...) type (*name) (__VA_ARGS__);
@@ -90,8 +90,8 @@ bool32 platformCreateVulkanSurface(void* vkInstance, void* surface, Window windo
 }
 
 
-AV_API Window platformCreateWindow(uint32 x, uint32 y, uint32 width, uint32 height, const char* title, void* ctx){
-	return backend.createWindow(x, y, width, height, title, ctx);
+AV_API Window platformCreateWindow(WindowConfig config){
+	return backend.createWindow(config);
 }
 AV_API void platformDestroyWindow(Window window){
 	return backend.destroyWindow(window);

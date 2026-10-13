@@ -4,10 +4,6 @@
 #include "logging.h"
 
 typedef struct ApplicationConfig {
-    int16 startPosX;
-    int16 startPosY;
-    int16 startWidth;
-    int16 startHeight;
     char* name;
 } ApplicationConfig;
 
@@ -16,7 +12,6 @@ typedef struct EngineState* EngineHandle;
 typedef struct EngineConfig {
     ApplicationConfig appConfig;
     bool8 (*initialize)(EngineHandle engine);
-    void (*onResize)(EngineHandle engine, uint32 width, uint32 height);
     void (*shutdown)(EngineHandle engine);
 } EngineConfig;
 

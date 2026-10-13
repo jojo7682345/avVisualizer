@@ -4,10 +4,6 @@
 
 typedef struct PlatformConfig {
     const char* applicationName;
-    int32 x;
-    int32 y;
-    int32 width;
-    int32 height;
 } PlatformConfig;
 
 /**
@@ -61,8 +57,24 @@ AV_API uint64 platformGetAllocationGranularity();
 
 
 typedef struct Window* Window;
+
+typedef struct WindowFlags {
+    bool32 hidden : 1;
+    bool32 dummyContent : 1;
+    bool32 disableEvents : 1;
+} WindowFlags;
+
+typedef struct WindowConfig {
+    uint32 x;
+    uint32 y;
+    uint32 width;
+    uint32 height;
+    const char* title;
+    WindowFlags flags;
+    void* ctx;
+} WindowConfig;
 /*x,y,width and height are only hints*/
-Window platformCreateWindow(uint32 x, uint32 y, uint32 width, uint32 height, const char* title, void* ctx);
+Window platformCreateWindow(WindowConfig config);
 void platformDestroyWindow(Window window);
 
 

@@ -84,7 +84,9 @@ static void handleTopLevelClose(void* data, struct xdg_toplevel* toplevel){
         .data.u32[0] = (uint32)((uint64)window->ctx),
     };
     //avDebug("Event fired");
-    eventFire(EVENT(EVENT_CODE_WINDOW_REQUEST_CLOSE, 0, eventData));
+    if(!window->flags.disableEvents){
+        eventFire(EVENT(EVENT_CODE_WINDOW_REQUEST_CLOSE, 0, eventData));
+    }
 }
 
 static const struct xdg_toplevel_listener toplevelListener = {
@@ -103,15 +105,16 @@ static const struct xdg_surface_listener surfaceListener = {
 };
 
 
-Window waylandWindowCreate(WaylandDisplay* display, uint32 width, uint32 height, const char* title, void* ctx){
+Window waylandWindowCreate(WaylandDisplay* display, WindowConfig config){
     if(display==NULL || !display->initialized) return NULL;
     Window window = avAllocate(sizeof(*window), "allocating window");
     if(window == NULL) return NULL;
     avMemset(window, 0, sizeof(struct Window));
-    window->ctx = ctx;
+    window->ctx = config.ctx;
     window->display = display;
-    window->requestedPixelWidth = width;
-    window->requestedPixelHeight = height;
+    window->flags = config.flags;
+    window->requestedPixelWidth = config.width;
+    window->requestedPixelHeight = config.height;
     window->surface = wl_compositor_create_surface(display->compositor);
     if(window->surface == NULL) goto error;
     window->xdgSurface = xdg_wm_base_get_xdg_surface(display->wmBase, window->surface);
@@ -120,12 +123,12 @@ Window waylandWindowCreate(WaylandDisplay* display, uint32 width, uint32 height,
     window->toplevel = xdg_surface_get_toplevel(window->xdgSurface);
     if(window->toplevel == NULL) goto error;
     if(xdg_toplevel_add_listener(window->toplevel, &toplevelListener, window) < 0) goto error;
-    xdg_toplevel_set_title(window->toplevel, title != NULL ? title : "-");
+    xdg_toplevel_set_title(window->toplevel, config.title != NULL ? config.title : "-");
     wl_surface_commit(window->surface);
     while(!window->configured){
         if(wl_display_roundtrip(display->display) < 0) goto error;
     }
-    if(!waylandWindowShowBlankBuffer(window)) goto error;
+    if(!window->flags.hidden && window->flags.dummyContent && !waylandWindowShowBlankBuffer(window)) goto error;
     return window;
 error:
     waylandWindowDestroy(window);

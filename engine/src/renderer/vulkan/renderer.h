@@ -48,6 +48,8 @@ typedef struct Gpu {
 	VkQueue computeQueue;
 	VkQueue transferQueue;
 	VkQueue presentQueue;
+
+	VkCommandPool mainCommandPool;
 } Gpu;
 
 typedef struct PresentTarget {
@@ -75,7 +77,7 @@ typedef struct RenderTarget {
 	VkSampleCountFlagBits samples;
 
 	RenderTargetType type;
-	PresentTarget presentTarget; // is owned by the renderTarget on the main gpu
+	PresentTarget* presentTarget; // is owned by the renderTarget on the main gpu
 	RenderTargetHandle presentationTarget; // is renderTarget image needs to be transfered to for cross gpu presenting, if -1 renderTarget is owned by other gpu
 } RenderTarget;
 
@@ -89,6 +91,7 @@ typedef struct Renderer {
 	GpuRequirements gpuRequirements; // stored for lazily activating gpu's
 
 	IdMapping(RenderTarget) renderTargets;
+	PresentTarget* presentTargets;
 	
 } Renderer;
 

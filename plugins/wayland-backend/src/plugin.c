@@ -56,11 +56,9 @@ bool32 waylandBackend_createVulkanSurface(void* instance, void* surface, Window 
 	return true;
 }
 
-Window waylandBackend_createWindow(uint32 x, uint32 y, uint32 width, uint32 height, const char* name, void* ctx){
-	(void)x;
-    (void)y;
+Window waylandBackend_createWindow(WindowConfig config){
     if(state==NULL)return NULL;
-    return waylandWindowCreate(&state->display, width, height, name, ctx);
+    return waylandWindowCreate(&state->display, config);
 	return NULL;
 }
 

@@ -248,6 +248,10 @@ static RenderTargetHandle renderTargetCreateFromSwapchain(VkExtent2D extent, VkF
 	return handle;
 }
 
+RenderTargetHandle renderTargetCreateImage(ImageRenderTargetConfig config){
+	
+}
+
 RenderTargetHandle renderTargetCreateFromSurface(VkSurfaceKHR surface, WindowRenderTargetConfig config){
 	Gpu* gpu;
 	if(!selectGpuForSurface(surface, &gpu)){
